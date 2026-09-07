@@ -300,9 +300,9 @@ function abrirModalVehiculo(placa){
         </div>
         <div class="doc-row-meta">
           ${d ? `Vence: ${fmtFecha(d.fecha_vencimiento)} · ${escapeHtml(d.nombre_archivo_original || "archivo sin nombre")}` : "Sin documento cargado"}
-          ${d?.storage_path ? ` · <a href="#" class="ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">ver archivo</a>` : ""}
         </div>
         <div class="doc-row-actions">
+          ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
           <input type="date" class="fecha-venc" value="${d?.fecha_vencimiento || ""}" />
           <label class="doc-file-label">📎 <span class="file-txt">Elegir archivo</span>
             <input type="file" class="file-input" accept="application/pdf,image/*" />
@@ -331,9 +331,9 @@ function abrirModalConductor(cedula){
         </div>
         <div class="doc-row-meta">
           ${d ? `Vence: ${fmtFecha(d.fecha_vencimiento)} · ${escapeHtml(d.nombre_archivo_original || "archivo sin nombre")}` : "Sin documento cargado"}
-          ${d?.storage_path ? ` · <a href="#" class="ver-archivo" data-bucket="conductor-documentos" data-path="${escapeHtml(d.storage_path)}">ver archivo</a>` : ""}
         </div>
         <div class="doc-row-actions">
+          ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="conductor-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
           <input type="text" class="categoria-lic" placeholder="Categoría (ej. C2)" value="${escapeHtml(d?.categoria_licencia || "")}" style="max-width:120px" />
           <input type="date" class="fecha-venc" value="${d?.fecha_vencimiento || ""}" />
           <label class="doc-file-label">📎 <span class="file-txt">Elegir archivo</span>
