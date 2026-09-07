@@ -7,7 +7,12 @@ const SUPABASE_URL = "https://cbplebkmxrkaafqdhiyi.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_DZCceNTENY4ViP17-eZrGg_bdMElZ9X";
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/portal-rutas-documentos`;
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// storageKey propio: este portal vive en el mismo dominio (desarrollocombuses.github.io)
+// que el panel principal, y localStorage se comparte por dominio, no por carpeta. Sin esto,
+// el portal reutiliza (por error) la sesion que el usuario ya tenga abierta en el panel principal.
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { storageKey: "portal-documentos-rutas-auth", persistSession: true, autoRefreshToken: true },
+});
 
 const authPanel = document.getElementById("authPanel");
 const appWrap = document.getElementById("appWrap");
@@ -129,6 +134,14 @@ async function mostrarApp(){
 }
 
 // ---------------- Carga de datos ----------------
+async function cerrarPorNoAutorizado(mensaje){
+  await sb.auth.signOut();
+  appWrap.classList.add("hidden");
+  authPanel.classList.remove("hidden");
+  authStatus.textContent = mensaje;
+  authStatus.className = "auth-status err";
+}
+
 async function cargarListado(){
   try {
     btnRefresh.disabled = true;
@@ -139,7 +152,12 @@ async function cargarListado(){
     renderVehiculos();
     renderConductores();
   } catch (err) {
-    showToast(err.message || "No se pudo cargar la información.", "err");
+    const msg = err.message || "No se pudo cargar la información.";
+    if (/no autenticado|no tiene ninguna ruta asignada|sesión expiró/i.test(msg)) {
+      await cerrarPorNoAutorizado("Esta cuenta no tiene acceso al portal. Inicia sesión con el usuario de tu ruta.");
+    } else {
+      showToast(msg, "err");
+    }
   } finally {
     btnRefresh.disabled = false;
   }
