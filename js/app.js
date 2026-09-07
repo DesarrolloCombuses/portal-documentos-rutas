@@ -147,7 +147,10 @@ async function cargarListado(){
     btnRefresh.disabled = true;
     const data = await callFn("listar", {});
     currentData = data;
-    rutaLabel.textContent = (data.rutas || []).join(" · ") || "—";
+    const { data: userData } = await sb.auth.getUser();
+    const email = userData?.user?.email || "";
+    const rutas = (data.rutas || []).join(" · ") || "—";
+    rutaLabel.innerHTML = `Ruta ${escapeHtml(rutas)} <span class="topbar-user">· conectado como <b>${escapeHtml(data.nombre_coordinador || email)}</b>${data.nombre_coordinador ? ` (${escapeHtml(email)})` : ""}</span>`;
     renderResumen();
     renderVehiculos();
     renderConductores();
@@ -242,11 +245,14 @@ function renderVehiculos(){
           </div>
           ${peor ? `<span class="status-pill ${estadoClass(peor)}">${estadoLabel(peor)}</span>` : ""}
         </div>
-        <div class="entity-card-badges">
+        <div class="entity-card-docs">
           ${(currentData.tipos_flota || []).map((t) => {
             const d = docFor(currentData.documentos_flota, (x) => x.placa === v.placa && x.tipo === t.tipo);
             const est = d ? d.estado_vencimiento : null;
-            return `<span class="status-pill ${estadoClass(est)}" title="${escapeHtml(t.label)}">${escapeHtml(t.label)}</span>`;
+            return `<div class="mini-doc">
+              <span class="mini-doc-label">${escapeHtml(t.label)}</span>
+              <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
+            </div>`;
           }).join("")}
         </div>
       </div>`;
@@ -278,8 +284,11 @@ function renderConductores(){
           </div>
           <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
         </div>
-        <div class="entity-card-badges">
-          <span class="status-pill ${estadoClass(est)}">Licencia de Conducción</span>
+        <div class="entity-card-docs">
+          <div class="mini-doc">
+            <span class="mini-doc-label">Licencia de Conducción</span>
+            <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
+          </div>
         </div>
       </div>`;
   }).join("");
