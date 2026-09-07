@@ -31,13 +31,21 @@ const buscarVehiculo = document.getElementById("buscarVehiculo");
 const buscarConductor = document.getElementById("buscarConductor");
 const secVehiculos = document.getElementById("secVehiculos");
 const secConductores = document.getElementById("secConductores");
+const secEscaneo = document.getElementById("secEscaneo");
 const docModal = document.getElementById("docModal");
 const docModalTitle = document.getElementById("docModalTitle");
 const docModalBody = document.getElementById("docModalBody");
 const docModalClose = document.getElementById("docModalClose");
 const toastEl = document.getElementById("toast");
+const fechaEscaneo = document.getElementById("fechaEscaneo");
+const inputEscanear = document.getElementById("inputEscanear");
+const inputEscanearGaleria = document.getElementById("inputEscanearGaleria");
+const btnElegirGaleria = document.getElementById("btnElegirGaleria");
+const btnGenerarPdf = document.getElementById("btnGenerarPdf");
+const escaneosGrid = document.getElementById("escaneosGrid");
 
 let currentData = null;
+let escaneosActuales = [];
 let toastTimer = null;
 
 function showToast(msg, kind){
@@ -427,10 +435,142 @@ document.querySelectorAll(".section-tab").forEach((tab) => {
     const target = tab.getAttribute("data-section");
     secVehiculos.classList.toggle("hidden", target !== "vehiculos");
     secConductores.classList.toggle("hidden", target !== "conductores");
+    secEscaneo.classList.toggle("hidden", target !== "escaneo");
+    if (target === "escaneo") cargarEscaneos();
   });
 });
 buscarVehiculo.addEventListener("input", renderVehiculos);
 buscarConductor.addEventListener("input", renderConductores);
+
+// ---------------- Escaneo de tarjetas de despacho ----------------
+function hoyISO(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+fechaEscaneo.value = hoyISO();
+
+async function cargarEscaneos(){
+  try {
+    const { escaneos } = await callFn("listar_escaneos", { fecha: fechaEscaneo.value });
+    escaneosActuales = escaneos || [];
+    renderEscaneos();
+  } catch (err) {
+    showToast(err.message || "No se pudieron cargar las tarjetas escaneadas.", "err");
+  }
+}
+
+function renderEscaneos(){
+  if (!escaneosActuales.length) {
+    escaneosGrid.innerHTML = `<div class="empty-state">Sin tarjetas escaneadas este día todavía.</div>`;
+    return;
+  }
+  escaneosGrid.innerHTML = escaneosActuales.map((e) => {
+    const hora = e.created_at ? new Date(e.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "";
+    return `
+      <div class="scan-thumb" data-id="${escapeHtml(e.id)}">
+        <img src="${escapeHtml(e.url || "")}" alt="Tarjeta de despacho" loading="lazy" />
+        <button class="scan-remove" data-id="${escapeHtml(e.id)}" title="Eliminar">✕</button>
+        ${hora ? `<div class="scan-thumb-time">${escapeHtml(hora)}</div>` : ""}
+      </div>`;
+  }).join("");
+
+  escaneosGrid.querySelectorAll(".scan-remove").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!window.confirm("¿Eliminar esta foto de tarjeta de despacho?")) return;
+      try {
+        await callFn("eliminar_escaneo", { id: btn.getAttribute("data-id") });
+        await cargarEscaneos();
+      } catch (err) {
+        showToast(err.message || "No se pudo eliminar.", "err");
+      }
+    });
+  });
+}
+
+async function subirFotoEscaneo(file){
+  if (!file) return;
+  try {
+    showToast("Subiendo foto…", "ok");
+    const fd = new FormData();
+    fd.set("ruta", (currentData?.rutas || [])[0] || "");
+    fd.set("fecha", fechaEscaneo.value);
+    fd.set("file", file);
+    await callFnUpload("subir_escaneo", fd);
+    await cargarEscaneos();
+    showToast("Tarjeta guardada.", "ok");
+  } catch (err) {
+    showToast(err.message || "No se pudo subir la foto.", "err");
+  }
+}
+
+fechaEscaneo.addEventListener("change", cargarEscaneos);
+inputEscanear.addEventListener("change", () => {
+  const file = inputEscanear.files?.[0];
+  inputEscanear.value = "";
+  subirFotoEscaneo(file);
+});
+btnElegirGaleria.addEventListener("click", () => inputEscanearGaleria.click());
+inputEscanearGaleria.addEventListener("change", async () => {
+  const files = Array.from(inputEscanearGaleria.files || []);
+  inputEscanearGaleria.value = "";
+  for (const file of files) {
+    await subirFotoEscaneo(file);
+  }
+});
+
+function loadImage(url){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("No se pudo leer una de las fotos."));
+    img.src = url;
+  });
+}
+
+function imagenAJpegDataUrl(img, maxDim, calidad){
+  const escala = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.max(1, Math.round(img.width * escala));
+  const h = Math.max(1, Math.round(img.height * escala));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+  return { dataUrl: canvas.toDataURL("image/jpeg", calidad), w, h };
+}
+
+btnGenerarPdf.addEventListener("click", async () => {
+  if (!escaneosActuales.length) { showToast("No hay tarjetas escaneadas este día para generar el PDF.", "warn"); return; }
+  btnGenerarPdf.disabled = true;
+  btnGenerarPdf.textContent = "Generando…";
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margen = 24;
+
+    for (let i = 0; i < escaneosActuales.length; i++) {
+      const img = await loadImage(escaneosActuales[i].url);
+      const { dataUrl, w, h } = imagenAJpegDataUrl(img, 1600, 0.82);
+      if (i > 0) doc.addPage();
+      const maxW = pageW - margen * 2;
+      const maxH = pageH - margen * 2;
+      const ratio = Math.min(maxW / w, maxH / h);
+      const outW = w * ratio;
+      const outH = h * ratio;
+      doc.addImage(dataUrl, "JPEG", (pageW - outW) / 2, (pageH - outH) / 2, outW, outH);
+    }
+
+    const ruta = ((currentData?.rutas || [])[0] || "ruta").replace(/[^\w-]+/g, "_");
+    doc.save(`tarjetas_despacho_${ruta}_${fechaEscaneo.value}.pdf`);
+  } catch (err) {
+    showToast(err.message || "No se pudo generar el PDF.", "err");
+  } finally {
+    btnGenerarPdf.disabled = false;
+    btnGenerarPdf.textContent = "📄 Generar PDF del día";
+  }
+});
 
 // ---------------- Arranque ----------------
 (async function init(){
