@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.3.0" />
+<link rel="stylesheet" href="css/styles.css?v=1.4.0" />
 </head>
 <body>
 
@@ -56,6 +56,11 @@
     </nav>
 
     <section id="secVehiculos" class="section">
+      <div id="alertaPreventivo" class="alert-panel hidden">
+        <div class="alert-panel-head">🔧 Próximas bimensuales (Mantenimiento Preventivo)</div>
+        <div id="alertaPreventivoBody" class="alert-list"></div>
+      </div>
+
       <div class="section-toolbar">
         <input type="search" id="buscarVehiculo" placeholder="Buscar por placa o interno…" />
       </div>
@@ -102,7 +107,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="js/app.js?v=1.3.0"></script>
-<script src="js/pwa.js?v=1.3.0"></script>
+<script src="js/app.js?v=1.4.0"></script>
+<script src="js/pwa.js?v=1.4.0"></script>
 </body>
 </html>

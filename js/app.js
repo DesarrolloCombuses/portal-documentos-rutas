@@ -25,6 +25,8 @@ const btnLogout = document.getElementById("btnLogout");
 const btnRefresh = document.getElementById("btnRefresh");
 const rutaLabel = document.getElementById("rutaLabel");
 const summaryBar = document.getElementById("summaryBar");
+const alertaPreventivo = document.getElementById("alertaPreventivo");
+const alertaPreventivoBody = document.getElementById("alertaPreventivoBody");
 const vehiculosGrid = document.getElementById("vehiculosGrid");
 const conductoresGrid = document.getElementById("conductoresGrid");
 const buscarVehiculo = document.getElementById("buscarVehiculo");
@@ -160,6 +162,7 @@ async function cargarListado(){
     const rutas = (data.rutas || []).join(" · ") || "—";
     rutaLabel.innerHTML = `Ruta ${escapeHtml(rutas)} <span class="topbar-user">· conectado como <b>${escapeHtml(data.nombre_coordinador || email)}</b>${data.nombre_coordinador ? ` (${escapeHtml(email)})` : ""}</span>`;
     renderResumen();
+    renderAlertaPreventivo();
     renderVehiculos();
     renderConductores();
   } catch (err) {
@@ -230,6 +233,54 @@ function renderResumen(){
     <div class="summary-chip chip-ok"><span class="n">${vigentes}</span> vigentes</div>
     <div class="summary-chip"><span class="n">${sinArchivo}</span> sin archivo</div>
   `;
+}
+
+// Alerta de programacion: vehiculos con Mantenimiento Preventivo (bimensual)
+// vencido o por vencer, ordenados por fecha para saber quien va primero.
+function diasRestantes(fechaISO){
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const fecha = new Date(y, m - 1, d);
+  return Math.round((fecha - hoy) / 86400000);
+}
+
+function textoDias(dias){
+  if (dias < 0) return `Vencido hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"}`;
+  if (dias === 0) return "Hoy";
+  if (dias === 1) return "Mañana";
+  return `En ${dias} días`;
+}
+
+function renderAlertaPreventivo(){
+  const filas = (currentData?.vehiculos || [])
+    .map((v) => {
+      const d = docFor(currentData?.documentos_flota, (x) => x.placa === v.placa && x.tipo === "MANTENIMIENTO_PREVENTIVO");
+      if (!d?.fecha_vencimiento) return null;
+      return { v, fecha: d.fecha_vencimiento, dias: diasRestantes(d.fecha_vencimiento) };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.dias - b.dias);
+
+  if (!filas.length) {
+    alertaPreventivo.classList.add("hidden");
+    return;
+  }
+  alertaPreventivo.classList.remove("hidden");
+  alertaPreventivoBody.innerHTML = filas.map(({ v, fecha, dias }) => {
+    const cls = dias < 0 ? "is-vencido" : dias <= 7 ? "is-pronto" : "";
+    return `
+      <div class="alert-row ${cls}" data-placa="${escapeHtml(v.placa)}">
+        <span class="alert-row-veh">${escapeHtml(v.placa)} <span class="alert-row-sub">Interno ${escapeHtml(v.interno || "—")}</span></span>
+        <span class="alert-row-fecha">
+          <span>${fmtFecha(fecha)}</span>
+          <span class="alert-row-dias" style="color:${dias < 0 ? "var(--err)" : dias <= 7 ? "var(--warn)" : "var(--fg-soft)"}">${textoDias(dias)}</span>
+        </span>
+      </div>`;
+  }).join("");
+
+  alertaPreventivoBody.querySelectorAll(".alert-row").forEach((row) => {
+    row.addEventListener("click", () => abrirModalVehiculo(row.getAttribute("data-placa")));
+  });
 }
 
 function renderVehiculos(){
