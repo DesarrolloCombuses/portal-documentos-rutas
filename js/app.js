@@ -167,6 +167,15 @@ function docFor(lista, matchFn){
   return (lista || []).find(matchFn) || null;
 }
 
+function docMetaHtml(d){
+  if (!d) return "Sin documento registrado.";
+  const vence = `Vence: ${fmtFecha(d.fecha_vencimiento)}`;
+  if (!d.storage_path) {
+    return `${vence} · <span class="doc-sin-archivo">sin archivo digitalizado todavía — sube el PDF o foto</span>`;
+  }
+  return `${vence} · ${escapeHtml(d.nombre_archivo_original || "archivo cargado")}`;
+}
+
 function estadoDeVehiculo(placa){
   const docs = (currentData?.documentos_flota || []).filter((d) => d.placa === placa);
   const tipos = currentData?.tipos_flota || [];
@@ -299,7 +308,7 @@ function abrirModalVehiculo(placa){
           <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
         </div>
         <div class="doc-row-meta">
-          ${d ? `Vence: ${fmtFecha(d.fecha_vencimiento)} · ${escapeHtml(d.nombre_archivo_original || "archivo sin nombre")}` : "Sin documento cargado"}
+          ${docMetaHtml(d)}
         </div>
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
@@ -330,7 +339,7 @@ function abrirModalConductor(cedula){
           <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
         </div>
         <div class="doc-row-meta">
-          ${d ? `Vence: ${fmtFecha(d.fecha_vencimiento)} · ${escapeHtml(d.nombre_archivo_original || "archivo sin nombre")}` : "Sin documento cargado"}
+          ${docMetaHtml(d)}
         </div>
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="conductor-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
