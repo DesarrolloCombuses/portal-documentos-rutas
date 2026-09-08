@@ -26,6 +26,7 @@ const btnRefresh = document.getElementById("btnRefresh");
 const rutaLabel = document.getElementById("rutaLabel");
 const summaryBar = document.getElementById("summaryBar");
 const vehiculosGrid = document.getElementById("vehiculosGrid");
+const docsPendientesConductor = document.getElementById("docsPendientesConductor");
 const conductoresGrid = document.getElementById("conductoresGrid");
 const buscarVehiculo = document.getElementById("buscarVehiculo");
 const buscarConductor = document.getElementById("buscarConductor");
@@ -265,6 +266,7 @@ async function cargarListado(){
     rutaLabel.innerHTML = `Ruta ${escapeHtml(rutas)} <span class="topbar-user">· conectado como <b>${escapeHtml(data.nombre_coordinador || email)}</b>${data.nombre_coordinador ? ` (${escapeHtml(email)})` : ""}</span>`;
     renderResumen();
     renderProgramacion();
+    renderDocumentosPendientes();
     renderVehiculos();
     renderConductores();
   } catch (err) {
@@ -335,6 +337,58 @@ function renderResumen(){
     <div class="summary-chip chip-ok"><span class="n">${vigentes}</span> vigentes</div>
     <div class="summary-chip"><span class="n">${sinArchivo}</span> sin archivo</div>
   `;
+}
+
+// Fotos que los conductores enviaron desde el checklist publico al ver un
+// documento vencido o por vencer -- el coordinador las revisa aqui y, si hace
+// falta, registra el documento oficial (con su fecha real) desde su tarjeta.
+function renderDocumentosPendientes(){
+  const pendientes = currentData?.documentos_pendientes_conductor || [];
+  if (!pendientes.length) {
+    docsPendientesConductor.classList.add("hidden");
+    docsPendientesConductor.innerHTML = "";
+    return;
+  }
+  const tiposF = currentData?.tipos_flota || [];
+  const labelTipo = (tipo) => tiposF.find((t) => t.tipo === tipo)?.label || tipo;
+
+  docsPendientesConductor.classList.remove("hidden");
+  docsPendientesConductor.innerHTML = `
+    <div class="doc-row" style="border-color:var(--warn); background:var(--warn-soft); margin-bottom:14px">
+      <div class="doc-row-head">
+        <span class="doc-row-title">📸 Fotos enviadas por conductores (${pendientes.length} pendiente${pendientes.length === 1 ? "" : "s"} de revisar)</span>
+      </div>
+      <div class="doc-row-hint">Un conductor vio un documento vencido o por vencer en su checklist y envió esta foto. Revísala y, si aplica, sube el documento oficial con su fecha real desde la tarjeta del vehículo.</div>
+      <div class="preop-docs-list" style="margin-top:8px">
+        ${pendientes.map((p) => `
+          <div class="preop-doc-row" data-id="${escapeHtml(p.id)}">
+            <div class="preop-doc-row-info">
+              <b>${escapeHtml(labelTipo(p.tipo))} · ${escapeHtml(p.placa)}</b>
+              <span class="muted">Enviada ${new Date(p.created_at).toLocaleString("es-CO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            </div>
+            <div class="doc-row-actions">
+              <button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(p.storage_path)}">👁 Ver foto</button>
+              <button class="btn btn-sm btn-primary btn-marcar-revisado">✅ Marcar revisado</button>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+
+  bindDocRowEvents(docsPendientesConductor, {});
+  docsPendientesConductor.querySelectorAll(".btn-marcar-revisado").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const documentoId = btn.closest(".preop-doc-row").getAttribute("data-id");
+      btn.disabled = true;
+      try {
+        await callFn("marcar_documento_revisado", { documento_id: documentoId });
+        showToast("Marcado como revisado.", "ok");
+        await cargarListado();
+      } catch (err) {
+        showToast(err.message || "No se pudo marcar como revisado.", "err");
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 // Alerta de programacion: vehiculos con Mantenimiento Preventivo (bimensual)

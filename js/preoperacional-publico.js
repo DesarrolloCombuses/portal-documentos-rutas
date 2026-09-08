@@ -10,6 +10,7 @@ const FUNCTION_URL = "https://cbplebkmxrkaafqdhiyi.supabase.co/functions/v1/preo
 
 const pubFiltroVehiculo = document.getElementById("pubFiltroVehiculo");
 const pubPlaca = document.getElementById("pubPlaca");
+const pubDocumentosVehiculo = document.getElementById("pubDocumentosVehiculo");
 const pubConductorWrap = document.getElementById("pubConductorWrap");
 const pubConductor = document.getElementById("pubConductor");
 const pubConductorConfirmado = document.getElementById("pubConductorConfirmado");
@@ -42,6 +43,7 @@ const toastEl = document.getElementById("toast");
 
 let vehiculos = [];
 let conductores = [];
+let yaRealizadosPorCedula = new Map();
 let toastTimer = null;
 
 function showToast(msg, kind){
@@ -185,15 +187,94 @@ pubFiltroVehiculo.addEventListener("input", renderVehiculoOptions);
 
 async function cargarCatalogo(){
   try {
-    const { vehiculos: vs, conductores: cs } = await callFn("catalogo", {});
+    const { vehiculos: vs, conductores: cs, yaRealizados } = await callFn("catalogo", {});
     vehiculos = (vs || []).slice().sort((a, b) => a.placa.localeCompare(b.placa));
     conductores = (cs || []).slice().sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+    yaRealizadosPorCedula = new Map((yaRealizados || []).map((r) => [String(r.conductor_cedula || "").trim(), r]));
     renderVehiculoOptions();
   } catch (err) {
     pubFormMsg.textContent = "No se pudo cargar la lista de vehículos. Verifica tu conexión y recarga la página.";
   }
 }
 cargarCatalogo();
+
+// ---------------- Documentos del vehículo (SOAT, tecnomecánica, etc.) ----------------
+// Al elegir el vehículo se muestra si tiene algún documento vencido o por
+// vencer, y se deja enviar una foto del documento actualizado directo al
+// coordinador (queda pendiente de que él la revise y registre la fecha real).
+const DOC_ESTADO_INFO = {
+  VIGENTE: { icono: "🟢", texto: "Vigente" },
+  POR_VENCER: { icono: "🟡", texto: "Vence pronto" },
+  VENCIDO: { icono: "🔴", texto: "Vencido" },
+  SIN_FECHA: { icono: "⚪", texto: "Sin fecha registrada" },
+  SIN_DOCUMENTO: { icono: "⚪", texto: "Sin registro" },
+};
+function fmtFechaDoc(iso){
+  if (!iso) return "";
+  const [y, m, d] = String(iso).split("-");
+  return d && m && y ? `${d}/${m}/${y}` : "";
+}
+
+pubPlaca.addEventListener("change", async () => {
+  const placa = pubPlaca.value;
+  if (!placa) { pubDocumentosVehiculo.classList.add("hidden"); pubDocumentosVehiculo.innerHTML = ""; return; }
+  pubDocumentosVehiculo.classList.remove("hidden");
+  pubDocumentosVehiculo.innerHTML = `<div class="muted" style="font-size:12.5px">Consultando documentos del vehículo…</div>`;
+  try {
+    const { documentos } = await callFn("documentos_vehiculo", { placa });
+    renderDocumentosVehiculo(placa, documentos || []);
+  } catch (err) {
+    pubDocumentosVehiculo.innerHTML = `<div class="muted" style="font-size:12.5px">No se pudo consultar el estado de los documentos.</div>`;
+  }
+});
+
+function renderDocumentosVehiculo(placa, documentos){
+  pubDocumentosVehiculo.innerHTML = `
+    <div class="preop-section-title" style="margin-top:0">📄 Documentos de este vehículo</div>
+    <div class="preop-docs-list">
+      ${documentos.map((d) => {
+        const info = DOC_ESTADO_INFO[d.estado] || DOC_ESTADO_INFO.SIN_DOCUMENTO;
+        const necesitaFoto = d.estado !== "VIGENTE";
+        const fecha = fmtFechaDoc(d.fecha_vencimiento);
+        return `
+          <div class="preop-doc-row" data-tipo="${escapeHtml(d.tipo)}">
+            <div class="preop-doc-row-info">
+              <b>${info.icono} ${escapeHtml(d.label)}</b>
+              <span class="muted">${info.texto}${fecha ? ` · ${fecha}` : ""}</span>
+            </div>
+            ${necesitaFoto ? `
+              <label class="btn btn-sm btn-ghost preop-doc-btn-foto">
+                📷 Enviar foto
+                <input type="file" accept="image/*" capture="environment" class="pub-doc-input" data-tipo="${escapeHtml(d.tipo)}" style="position:absolute;inset:0;opacity:0;cursor:pointer" />
+              </label>` : ""}
+          </div>`;
+      }).join("")}
+    </div>
+  `;
+
+  pubDocumentosVehiculo.querySelectorAll(".pub-doc-input").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      input.value = "";
+      if (!file) return;
+      const tipo = input.getAttribute("data-tipo");
+      const row = input.closest(".preop-doc-row");
+      try {
+        showToast("Subiendo foto…", "ok");
+        const fd = new FormData();
+        fd.set("placa", placa);
+        fd.set("tipo", tipo);
+        fd.set("file", file);
+        await callFnUpload("subir_documento_vehiculo", fd);
+        row.querySelector(".preop-doc-btn-foto")?.remove();
+        row.insertAdjacentHTML("beforeend", `<span style="font-size:12px;color:var(--ok);font-weight:700">✅ Enviada, tu coordinador la revisará</span>`);
+        showToast("Foto enviada al coordinador.", "ok");
+      } catch (err) {
+        showToast(err.message || "No se pudo enviar la foto.", "err");
+      }
+    });
+  });
+}
 
 // ---------------- Modal de error/aviso ----------------
 let pubErrorAlCerrar = null;
@@ -240,20 +321,30 @@ pubCedula.addEventListener("input", () => {
 
 // Único flujo para identificar al conductor: escriben la cédula y se busca
 // en el catálogo. Si no existe, un modal se lo avisa (en vez de dejarlo
-// escribir el nombre a mano).
+// escribir el nombre a mano). Si ya llenó su preoperacional hoy, tambien se
+// lo avisa aqui mismo -- antes de que llene todo el formulario de nuevo.
 pubCedula.addEventListener("change", () => {
   const cedula = pubCedula.value.trim();
   if (!cedula) return;
   const match = conductores.find((c) => (c.cedula || "").trim() === cedula);
-  if (match?.nombre) {
-    bloquearConductor(match.nombre, match.cedula);
+  if (!match?.nombre) {
+    mostrarError(
+      "❌ Cédula no encontrada",
+      `No encontramos ningún conductor registrado con la cédula ${cedula}. Verifica que esté bien escrita o contacta a tu coordinador de ruta.`,
+      () => { pubCedula.value = ""; pubCedula.focus(); }
+    );
     return;
   }
-  mostrarError(
-    "❌ Cédula no encontrada",
-    `No encontramos ningún conductor registrado con la cédula ${cedula}. Verifica que esté bien escrita o contacta a tu coordinador de ruta.`,
-    () => { pubCedula.value = ""; pubCedula.focus(); }
-  );
+  bloquearConductor(match.nombre, match.cedula);
+
+  const hecho = yaRealizadosPorCedula.get(cedula);
+  if (hecho) {
+    const hora = hecho.created_at ? new Date(hecho.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "";
+    mostrarError(
+      "✅ Ya hiciste tu preoperacional hoy",
+      `Ya registraste tu checklist de hoy${hora ? ` a las ${hora}` : ""} para el vehículo ${hecho.placa}. Si necesitas hacerlo de nuevo (por ejemplo, para otro vehículo), puedes continuar.`
+    );
+  }
 });
 
 // ---------------- Mini-tutorial ----------------
@@ -386,6 +477,8 @@ btnOtroChecklist.addEventListener("click", () => {
   publicExito.classList.add("hidden");
   publicFormWrap.classList.remove("hidden");
   pubPlaca.value = "";
+  pubDocumentosVehiculo.classList.add("hidden");
+  pubDocumentosVehiculo.innerHTML = "";
   desbloquearConductor();
   pubKilometraje.value = "";
   pubFiltroVehiculo.value = "";

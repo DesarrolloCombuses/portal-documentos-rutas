@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Preoperacional" />
-<link rel="stylesheet" href="css/styles.css?v=1.9.5" />
+<link rel="stylesheet" href="css/styles.css?v=1.9.6" />
 </head>
 <body>
 
@@ -23,6 +23,7 @@
       <h1>Checklist Preoperacional</h1>
       <p class="auth-sub">Combuses · Zamora y Aranjuez - Guadalupe</p>
       <button type="button" class="btn btn-ghost btn-sm" id="btnAyuda">❓ ¿Cómo funciona?</button>
+      <div><span class="app-version" id="appVersion" title="Toca para buscar actualización">—</span></div>
     </div>
 
     <div id="publicFormWrap">
@@ -52,6 +53,8 @@
           <input type="number" inputmode="numeric" min="0" id="pubKilometraje" placeholder="Ej. 152340" required />
         </div>
       </div>
+
+      <div id="pubDocumentosVehiculo" class="hidden"></div>
 
       <div class="preop-conductor-confirmado hidden" id="pubConductorConfirmado">
         <span class="preop-conductor-confirmado-check">✅</span>
@@ -91,7 +94,7 @@
     <div class="modal-body">
       <ol class="preop-tutorial-steps">
         <li><b>1. Declara tu condición</b><br />Di si estás descansado y en condiciones de conducir hoy. Es obligatorio y va primero.</li>
-        <li><b>2. Busca tu vehículo</b><br />Escribe la placa o el número interno y selecciónalo.</li>
+        <li><b>2. Busca tu vehículo</b><br />Escribe la placa o el número interno y selecciónalo. Ahí mismo verás si algún documento (SOAT, tecnomecánica, etc.) está vencido o por vencer, y puedes enviarle una foto al coordinador si ya lo renovaste.</li>
         <li><b>3. Escribe tu cédula</b><br />Tu nombre aparece solo, no se escribe a mano. Si no aparece, avísale a tu coordinador de ruta.</li>
         <li><b>4. Marca cada verificación</b><br />🟢 OK &nbsp;·&nbsp; 🟡 Alerta &nbsp;·&nbsp; 🔴 Falla. Toma menos de 3 minutos.</li>
         <li><b>5. Guarda</b><br />Si marcaste alguna falla, puedes agregar una foto como evidencia.</li>
@@ -116,7 +119,7 @@
 
 <div id="toast" class="toast hidden"></div>
 
-<script src="js/preoperacional-publico.js?v=1.9.5"></script>
-<script src="js/pwa.js?v=1.9.5"></script>
+<script src="js/preoperacional-publico.js?v=1.9.6"></script>
+<script src="js/pwa.js?v=1.9.6"></script>
 </body>
 </html>
