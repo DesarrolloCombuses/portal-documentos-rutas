@@ -253,3 +253,75 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
 .toast.err{background:var(--err)}
 
 .empty-state{color:var(--fg-soft); font-size:13px; padding:30px; text-align:center}
+
+/* ---- Preoperacional ---- */
+.preop-toolbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px}
+.preop-toolbar input[type="search"]{max-width:280px; flex:1}
+.preop-filtros-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:14px}
+.preop-filtros{display:flex; gap:6px; flex-wrap:wrap}
+.preop-filtro{
+  border:1px solid var(--line-strong); background:var(--bg-elev); color:var(--fg-muted);
+  padding:6px 12px; border-radius:999px; font-size:12px; font-weight:600; cursor:pointer;
+}
+.preop-filtro:hover{background:var(--bg-muted)}
+.preop-filtro.active{background:var(--brand); border-color:var(--brand); color:#fff}
+
+.preop-list{display:flex; flex-direction:column; gap:8px}
+.preop-row{
+  background:var(--bg-elev); border:1px solid var(--line); border-radius:10px;
+  padding:12px; box-shadow:var(--shadow-sm); cursor:pointer;
+}
+.preop-row:hover{border-color:var(--brand)}
+.preop-row.st-critico{background:var(--err-soft); border-color:transparent}
+.preop-row.st-alerta{background:var(--warn-soft); border-color:transparent}
+.preop-row-main{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
+.preop-row-veh{font-weight:700; font-size:13.5px}
+.preop-row-sub{color:var(--fg-soft); font-size:12px; font-weight:400}
+.preop-row-fecha{font-size:12px; color:var(--fg-soft); white-space:nowrap}
+.preop-badge{font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap}
+.preop-badge.st-ok{background:var(--ok-soft); color:var(--ok)}
+.preop-badge.st-alerta{background:var(--warn-soft); color:var(--warn)}
+.preop-badge.st-critico{background:var(--err-soft); color:var(--err)}
+.preop-row-fallas{margin-top:6px; font-size:12px; color:var(--fg-muted)}
+
+.modal-box-lg{max-width:720px}
+
+.preop-form-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:14px}
+.preop-form-field{display:flex; flex-direction:column; gap:6px}
+.preop-form-field label{font-size:12px; font-weight:600; color:var(--fg-muted)}
+
+.preop-section-title{
+  font-weight:700; font-size:13px; margin:18px 0 8px; padding-top:12px; border-top:1px solid var(--line);
+}
+.preop-section-title:first-of-type{margin-top:0; padding-top:0; border-top:none}
+
+.preop-item{margin-bottom:12px}
+.preop-item-label{font-size:12.5px; font-weight:600; color:var(--fg-muted); margin-bottom:6px; display:block}
+.preop-radio-group{display:flex; gap:8px; flex-wrap:wrap}
+.preop-radio-option{
+  display:flex; align-items:center; gap:6px; padding:7px 12px; background:var(--bg-muted);
+  border:1.5px solid var(--line); border-radius:8px; cursor:pointer; font-size:12.5px; transition:all .15s;
+}
+.preop-radio-option:hover{border-color:var(--brand)}
+.preop-radio-option.checked{border-color:var(--brand); background:var(--brand-soft)}
+.preop-radio-option input{margin:0}
+.preop-item.has-error .preop-radio-group{outline:2px solid var(--err); outline-offset:3px; border-radius:8px}
+.preop-item.has-error .preop-item-label{color:var(--err)}
+
+.preop-detalle-grid{display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin-bottom:14px}
+.preop-detalle-item{
+  padding:8px 10px; border-radius:8px; font-size:12.5px; display:flex; justify-content:space-between; gap:8px;
+  background:var(--bg-muted);
+}
+.preop-detalle-item.nivel-1{background:var(--warn-soft); color:#92400e}
+.preop-detalle-item.nivel-2{background:var(--err-soft); color:#991b1b}
+.preop-detalle-item-label{color:var(--fg-soft)}
+.preop-detalle-item.nivel-1 .preop-detalle-item-label,
+.preop-detalle-item.nivel-2 .preop-detalle-item-label{color:inherit; opacity:.8}
+
+.preop-evidencia-block{
+  border:1px dashed var(--line-strong); border-radius:10px; padding:10px; margin-bottom:8px;
+}
+.preop-evidencia-head{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px}
+.preop-evidencia-fotos{display:flex; gap:8px; flex-wrap:wrap}
+.preop-evidencia-fotos img{width:80px; height:80px; object-fit:cover; border-radius:8px; border:1px solid var(--line); cursor:pointer}

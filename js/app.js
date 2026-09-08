@@ -33,6 +33,7 @@ const secVehiculos = document.getElementById("secVehiculos");
 const secConductores = document.getElementById("secConductores");
 const secProgramacion = document.getElementById("secProgramacion");
 const secEscaneo = document.getElementById("secEscaneo");
+const secPreoperacional = document.getElementById("secPreoperacional");
 const progFiltros = document.getElementById("progFiltros");
 const progList = document.getElementById("progList");
 const btnExportarProgPdf = document.getElementById("btnExportarProgPdf");
@@ -47,11 +48,105 @@ const inputEscanearGaleria = document.getElementById("inputEscanearGaleria");
 const btnElegirGaleria = document.getElementById("btnElegirGaleria");
 const btnGenerarPdf = document.getElementById("btnGenerarPdf");
 const escaneosGrid = document.getElementById("escaneosGrid");
+const btnNuevoPreop = document.getElementById("btnNuevoPreop");
+const buscarPreop = document.getElementById("buscarPreop");
+const btnExportarPreopPdf = document.getElementById("btnExportarPreopPdf");
+const preopList = document.getElementById("preopList");
+const preopModal = document.getElementById("preopModal");
+const preopModalTitle = document.getElementById("preopModalTitle");
+const preopModalBody = document.getElementById("preopModalBody");
+const preopModalClose = document.getElementById("preopModalClose");
 
 let currentData = null;
 let escaneosActuales = [];
 let progFiltroActivo = "todas";
+let preopActuales = [];
+let preopEvidencias = [];
+let preopRangoActivo = "hoy";
+let preopEstadoActivo = "todas";
 let toastTimer = null;
+
+// ---------------- Checklist preoperacional: catálogo de items ----------------
+// Mismas 17 verificaciones + combustible del formulario original (AppScript),
+// ahora sobre Supabase. campo (camelCase) <-> columna real en public.preoperacionales.
+const PREOP_COLUMNA = {
+  aceite: "aceite", refrigerante: "refrigerante", frenos: "frenos",
+  neumaticos: "neumaticos", desgaste: "desgaste",
+  lucesDelanteras: "luces_delanteras", lucesTraseras: "luces_traseras", direccionales: "direccionales",
+  frenosServicio: "frenos_servicio", frenoEstacionamiento: "freno_estacionamiento",
+  espejos: "espejos", limpiaparabrisas: "limpiaparabrisas", cinturones: "cinturones",
+  extintor: "extintor", botiquin: "botiquin", triangulos: "triangulos", documentacion: "documentacion",
+};
+// Nivel de severidad por valor: 0=OK, 1=alerta (amarillo), 2=crítico (rojo). Solo para
+// pintar el semáforo en el portal — el servidor recalcula esto de forma independiente.
+const PREOP_NIVELES = {
+  aceite: { OK: 0, "Bajo": 1, "Requiere Cambio": 2 },
+  refrigerante: { OK: 0, "Bajo": 1, "Falta": 2 },
+  frenos: { OK: 0, "Bajo": 1, "Requiere Cambio": 2 },
+  neumaticos: { OK: 0, "Baja": 1, "Desinflado": 2 },
+  desgaste: { OK: 0, "Desgastado": 1, "Peligroso": 2 },
+  lucesDelanteras: { OK: 0, "Una No Sirve": 1, "No Encienden": 2 },
+  lucesTraseras: { OK: 0, "Una No Sirve": 1, "No Encienden": 2 },
+  direccionales: { OK: 0, "Alguna Fallando": 1, "No Funcionan": 2 },
+  frenosServicio: { OK: 0, "Suaves": 1, "No Funcionan": 2 },
+  frenoEstacionamiento: { OK: 0, "Flojo": 1, "No Funciona": 2 },
+  espejos: { OK: 0, "Ajustar": 1, "Dañado": 2 },
+  limpiaparabrisas: { OK: 0, "No Limpian Bien": 1, "No Funcionan": 2 },
+  cinturones: { OK: 0, "Alguno Dañado": 1, "No Funcionan": 2 },
+  extintor: { OK: 0, "Vencido": 1, "Falta": 2 },
+  botiquin: { OK: 0, "Incompleto": 1, "Falta": 2 },
+  triangulos: { OK: 0, "Falta Uno": 1, "Faltan": 2 },
+  documentacion: { OK: 0, "Falta Alguna": 1, "Vencida": 2 },
+};
+const PREOP_SECCIONES = [
+  { titulo: "⚗️ Niveles de Fluidos", items: [
+    { key: "aceite", label: "Nivel de Aceite del Motor", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Bajo", label: "⚠️ Bajo" }, { value: "Requiere Cambio", label: "❌ Requiere Cambio" }] },
+    { key: "refrigerante", label: "Nivel de Refrigerante", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Bajo", label: "⚠️ Bajo" }, { value: "Falta", label: "❌ Falta" }] },
+    { key: "frenos", label: "Nivel de Líquido de Frenos", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Bajo", label: "⚠️ Bajo" }, { value: "Requiere Cambio", label: "❌ Requiere Cambio" }] },
+  ]},
+  { titulo: "🌀 Neumáticos", items: [
+    { key: "neumaticos", label: "Presión de Neumáticos", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Baja", label: "⚠️ Baja" }, { value: "Desinflado", label: "❌ Desinflado" }] },
+    { key: "desgaste", label: "Desgaste de Neumáticos", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Desgastado", label: "⚠️ Desgastado" }, { value: "Peligroso", label: "❌ Peligroso" }] },
+  ]},
+  { titulo: "💡 Sistema de Iluminación", items: [
+    { key: "lucesDelanteras", label: "Luces Delanteras", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Una No Sirve", label: "⚠️ Una No Sirve" }, { value: "No Encienden", label: "❌ No Encienden" }] },
+    { key: "lucesTraseras", label: "Luces Traseras y Stop", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Una No Sirve", label: "⚠️ Una No Sirve" }, { value: "No Encienden", label: "❌ No Encienden" }] },
+    { key: "direccionales", label: "Direccionales e Intermitentes", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Alguna Fallando", label: "⚠️ Alguna Fallando" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
+  ]},
+  { titulo: "🛑 Sistema de Frenos", items: [
+    { key: "frenosServicio", label: "Frenos de Servicio", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Suaves", label: "⚠️ Suaves" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
+    { key: "frenoEstacionamiento", label: "Freno de Estacionamiento", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Flojo", label: "⚠️ Flojo" }, { value: "No Funciona", label: "❌ No Funciona" }] },
+  ]},
+  { titulo: "🛡️ Elementos de Seguridad", items: [
+    { key: "espejos", label: "Espejos Retrovisores", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Ajustar", label: "⚠️ Requiere Ajuste" }, { value: "Dañado", label: "❌ Dañado" }] },
+    { key: "limpiaparabrisas", label: "Limpiaparabrisas", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "No Limpian Bien", label: "⚠️ No Limpian Bien" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
+    { key: "cinturones", label: "Cinturones de Seguridad", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Alguno Dañado", label: "⚠️ Alguno Dañado" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
+    { key: "extintor", label: "Extintor", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Vencido", label: "⚠️ Vencido" }, { value: "Falta", label: "❌ Falta" }] },
+    { key: "botiquin", label: "Botiquín de Primeros Auxilios", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Incompleto", label: "⚠️ Incompleto" }, { value: "Falta", label: "❌ Falta" }] },
+    { key: "triangulos", label: "Triángulos de Emergencia", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Falta Uno", label: "⚠️ Falta Uno" }, { value: "Faltan", label: "❌ Faltan" }] },
+    { key: "documentacion", label: "Documentación en Orden", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Falta Alguna", label: "⚠️ Falta Alguna" }, { value: "Vencida", label: "❌ Vencida" }] },
+  ]},
+];
+const PREOP_COMBUSTIBLE_ITEM = { key: "combustible", label: "Nivel de Combustible", opciones: [
+  { value: "Lleno", label: "⛽ Lleno" }, { value: "3/4", label: "⛽ 3/4" }, { value: "1/2", label: "⛽ 1/2" },
+  { value: "1/4", label: "⛽ 1/4" }, { value: "Reserva", label: "⚠️ Reserva" }] };
 
 function showToast(msg, kind){
   toastEl.textContent = msg;
@@ -635,8 +730,10 @@ document.querySelectorAll(".section-tab").forEach((tab) => {
     secConductores.classList.toggle("hidden", target !== "conductores");
     secProgramacion.classList.toggle("hidden", target !== "programacion");
     secEscaneo.classList.toggle("hidden", target !== "escaneo");
+    secPreoperacional.classList.toggle("hidden", target !== "preoperacional");
     if (target === "programacion") renderProgramacion();
     if (target === "escaneo") cargarEscaneos();
+    if (target === "preoperacional") cargarPreoperacionales();
   });
 });
 buscarVehiculo.addEventListener("input", renderVehiculos);
@@ -770,6 +867,350 @@ btnGenerarPdf.addEventListener("click", async () => {
     btnGenerarPdf.disabled = false;
     btnGenerarPdf.textContent = "📄 Generar PDF del día";
   }
+});
+
+// ---------------- Checklist preoperacional ----------------
+function isoOffsetDias(dias){
+  const d = new Date();
+  d.setDate(d.getDate() - dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+async function cargarPreoperacionales(){
+  try {
+    const extra = {};
+    if (preopRangoActivo === "hoy") { extra.desde = hoyISO(); extra.hasta = hoyISO(); }
+    else if (preopRangoActivo === "7") { extra.desde = isoOffsetDias(6); extra.hasta = hoyISO(); }
+    else if (preopRangoActivo === "30") { extra.desde = isoOffsetDias(29); extra.hasta = hoyISO(); }
+    const { preoperacionales, evidencias } = await callFn("listar_preoperacionales", extra);
+    preopActuales = preoperacionales || [];
+    preopEvidencias = evidencias || [];
+    renderPreopList();
+  } catch (err) {
+    showToast(err.message || "No se pudieron cargar los preoperacionales.", "err");
+  }
+}
+
+function badgeEstado(estado){
+  return { OK: "🟢 OK", ALERTA: "🟡 Alerta", CRITICO: "🔴 Crítico" }[estado] || (estado || "—");
+}
+function claseEstado(estado){
+  return { OK: "st-ok", ALERTA: "st-alerta", CRITICO: "st-critico" }[estado] || "";
+}
+
+function fallasDe(p){
+  return PREOP_SECCIONES.flatMap((s) => s.items)
+    .map((item) => {
+      const valor = p[PREOP_COLUMNA[item.key]];
+      const nivel = (PREOP_NIVELES[item.key] || {})[valor] ?? 0;
+      return { item, valor, nivel };
+    })
+    .filter((x) => x.nivel > 0);
+}
+
+function preopFilasFiltradas(){
+  const term = (buscarPreop.value || "").trim().toLowerCase();
+  return preopActuales.filter((p) => {
+    if (preopEstadoActivo !== "todas" && p.estado_general !== preopEstadoActivo) return false;
+    if (!term) return true;
+    return (p.placa || "").toLowerCase().includes(term)
+      || (p.interno || "").toLowerCase().includes(term)
+      || (p.conductor_nombre || "").toLowerCase().includes(term);
+  });
+}
+
+function renderPreopList(){
+  const filas = preopFilasFiltradas();
+  if (!preopActuales.length) {
+    preopList.innerHTML = `<div class="empty-state">Todavía no hay checklists preoperacionales en este período.</div>`;
+    return;
+  }
+  if (!filas.length) {
+    preopList.innerHTML = `<div class="empty-state">No hay checklists que coincidan con este filtro.</div>`;
+    return;
+  }
+  preopList.innerHTML = filas.map((p) => {
+    const fallas = fallasDe(p);
+    const hora = p.created_at ? new Date(p.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "";
+    return `
+      <div class="preop-row ${claseEstado(p.estado_general)}" data-id="${escapeHtml(p.id)}">
+        <div class="preop-row-main">
+          <span class="preop-row-veh">${escapeHtml(p.placa)} <span class="preop-row-sub">Interno ${escapeHtml(p.interno || "—")} · ${escapeHtml(p.conductor_nombre || "—")}</span></span>
+          <span class="preop-row-fecha">${fmtFecha(p.fecha)}${hora ? ` · ${escapeHtml(hora)}` : ""}</span>
+          <span class="preop-badge ${claseEstado(p.estado_general)}">${badgeEstado(p.estado_general)}</span>
+        </div>
+        ${fallas.length ? `<div class="preop-row-fallas">⚠ ${fallas.map((f) => `${escapeHtml(f.item.label)}: ${escapeHtml(f.valor)}`).join(" · ")}</div>` : ""}
+      </div>`;
+  }).join("");
+
+  preopList.querySelectorAll(".preop-row").forEach((row) => {
+    row.addEventListener("click", () => abrirPreopDetalle(row.getAttribute("data-id")));
+  });
+}
+
+function renderPreopRadioGroup(item){
+  return `
+    <div class="preop-item" data-key="${escapeHtml(item.key)}">
+      <span class="preop-item-label">${escapeHtml(item.label)}</span>
+      <div class="preop-radio-group">
+        ${item.opciones.map((o) => `
+          <label class="preop-radio-option">
+            <input type="radio" name="preop_${escapeHtml(item.key)}" value="${escapeHtml(o.value)}" />
+            ${escapeHtml(o.label)}
+          </label>`).join("")}
+      </div>
+    </div>`;
+}
+
+function cerrarPreopModal(){
+  preopModal.classList.add("hidden");
+  preopModalBody.innerHTML = "";
+}
+preopModalClose.addEventListener("click", cerrarPreopModal);
+preopModal.addEventListener("click", (ev) => { if (ev.target === preopModal) cerrarPreopModal(); });
+
+function abrirPreopForm(){
+  preopModalTitle.textContent = "Nuevo checklist preoperacional";
+  const vehiculos = (currentData?.vehiculos || []).slice().sort((a, b) => a.placa.localeCompare(b.placa));
+  const conductores = (currentData?.conductores || []).slice().sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+
+  const seccionesHtml = PREOP_SECCIONES.map((s) => `
+    <div class="preop-section-title">${escapeHtml(s.titulo)}</div>
+    ${s.items.map((it) => renderPreopRadioGroup(it)).join("")}
+  `).join("");
+
+  preopModalBody.innerHTML = `
+    <div class="preop-form-grid">
+      <div class="preop-form-field">
+        <label>Vehículo (placa) *</label>
+        <select id="preopPlaca" required>
+          <option value="" disabled selected>Selecciona el vehículo…</option>
+          ${vehiculos.map((v) => `<option value="${escapeHtml(v.placa)}">${escapeHtml(v.placa)} — Interno ${escapeHtml(v.interno || "—")}</option>`).join("")}
+        </select>
+      </div>
+      <div class="preop-form-field">
+        <label>Conductor *</label>
+        <select id="preopConductor" required>
+          <option value="" disabled selected>Selecciona el conductor…</option>
+          ${conductores.map((c) => `<option value="${escapeHtml(c.cedula)}">${escapeHtml(c.nombre)} — CC ${escapeHtml(c.cedula)}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    ${seccionesHtml}
+    <div class="preop-section-title">⛽ Combustible y Observaciones</div>
+    ${renderPreopRadioGroup(PREOP_COMBUSTIBLE_ITEM)}
+    <div class="preop-form-field" style="margin-bottom:14px">
+      <label>Observaciones</label>
+      <textarea id="preopObservaciones" rows="3" placeholder="Falla, comentario u observación adicional…" style="width:100%;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;font-family:inherit"></textarea>
+    </div>
+    <div id="preopFormMsg" class="auth-status err"></div>
+    <button class="btn btn-primary btn-block" id="btnGuardarPreop">💾 Guardar checklist</button>
+  `;
+
+  preopModalBody.querySelectorAll(".preop-radio-option input").forEach((input) => {
+    input.addEventListener("change", () => {
+      const grupo = input.closest(".preop-radio-group");
+      grupo.querySelectorAll(".preop-radio-option").forEach((o) => o.classList.remove("checked"));
+      input.closest(".preop-radio-option").classList.add("checked");
+      input.closest(".preop-item")?.classList.remove("has-error");
+    });
+  });
+
+  document.getElementById("btnGuardarPreop").addEventListener("click", guardarPreopDesdeForm);
+  preopModal.classList.remove("hidden");
+}
+
+async function guardarPreopDesdeForm(){
+  const btn = document.getElementById("btnGuardarPreop");
+  const msg = document.getElementById("preopFormMsg");
+  msg.textContent = "";
+
+  const placa = document.getElementById("preopPlaca").value;
+  const cedula = document.getElementById("preopConductor").value;
+  if (!placa || !cedula) {
+    msg.textContent = "Selecciona el vehículo y el conductor.";
+    return;
+  }
+  const conductor = (currentData.conductores || []).find((c) => c.cedula === cedula);
+
+  const payload = { placa, conductor_cedula: cedula, conductor_nombre: conductor?.nombre || "" };
+  const todosLosItems = PREOP_SECCIONES.flatMap((s) => s.items).concat([PREOP_COMBUSTIBLE_ITEM]);
+  let faltan = false;
+  todosLosItems.forEach((it) => {
+    const checked = preopModalBody.querySelector(`input[name="preop_${it.key}"]:checked`);
+    const itemEl = preopModalBody.querySelector(`.preop-item[data-key="${it.key}"]`);
+    if (!checked) {
+      faltan = true;
+      itemEl?.classList.add("has-error");
+      return;
+    }
+    itemEl?.classList.remove("has-error");
+    payload[it.key] = checked.value;
+  });
+  payload.observaciones = document.getElementById("preopObservaciones").value.trim();
+
+  if (faltan) {
+    msg.textContent = "Completa todas las verificaciones marcadas en rojo.";
+    preopModalBody.querySelector(".has-error")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Guardando…";
+  try {
+    const { preoperacional, alertas } = await callFn("guardar_preoperacional", payload);
+    showToast("Checklist guardado.", "ok");
+    await cargarPreoperacionales();
+    if (alertas && alertas.length) {
+      abrirPreopDetalle(preoperacional.id);
+    } else {
+      cerrarPreopModal();
+    }
+  } catch (err) {
+    msg.textContent = err.message || "No se pudo guardar el checklist.";
+    btn.disabled = false;
+    btn.textContent = "💾 Guardar checklist";
+  }
+}
+
+function abrirPreopDetalle(id){
+  const p = preopActuales.find((x) => x.id === id);
+  if (!p) return;
+  preopModalTitle.textContent = `${p.placa} · ${fmtFecha(p.fecha)}`;
+
+  const todosLosItems = PREOP_SECCIONES.flatMap((s) => s.items);
+  const detalleHtml = todosLosItems.map((it) => {
+    const valor = p[PREOP_COLUMNA[it.key]];
+    const nivel = (PREOP_NIVELES[it.key] || {})[valor] ?? 0;
+    return `<div class="preop-detalle-item nivel-${nivel}">
+      <span class="preop-detalle-item-label">${escapeHtml(it.label)}</span>
+      <b>${escapeHtml(valor || "—")}</b>
+    </div>`;
+  }).join("");
+
+  const fallas = fallasDe(p);
+  const evidenciasPorCampo = {};
+  preopEvidencias.filter((e) => e.preoperacional_id === p.id).forEach((e) => {
+    (evidenciasPorCampo[e.campo] = evidenciasPorCampo[e.campo] || []).push(e);
+  });
+
+  const evidenciasHtml = fallas.map(({ item }) => {
+    const fotos = evidenciasPorCampo[item.key] || [];
+    return `
+      <div class="preop-evidencia-block" data-campo="${escapeHtml(item.key)}">
+        <div class="preop-evidencia-head">
+          <b>${escapeHtml(item.label)}</b>
+          <label class="btn btn-sm btn-ghost" style="position:relative;cursor:pointer">
+            📷 Agregar foto
+            <input type="file" accept="image/*" capture="environment" class="preop-evid-input" style="position:absolute;inset:0;opacity:0;cursor:pointer" />
+          </label>
+        </div>
+        <div class="preop-evidencia-fotos">
+          ${fotos.map((f) => `<img src="${escapeHtml(f.url || "")}" alt="Evidencia" loading="lazy" />`).join("") || `<span class="muted" style="font-size:12px">Sin foto todavía.</span>`}
+        </div>
+      </div>`;
+  }).join("");
+
+  preopModalBody.innerHTML = `
+    <div style="margin-bottom:10px;font-size:13px;color:var(--fg-soft)">
+      Conductor: <b>${escapeHtml(p.conductor_nombre || "—")}</b> · Interno ${escapeHtml(p.interno || "—")}
+      ${p.observaciones ? `<div style="margin-top:6px">📝 ${escapeHtml(p.observaciones)}</div>` : ""}
+    </div>
+    <div class="preop-detalle-grid">${detalleHtml}</div>
+    ${fallas.length ? `<div class="preop-section-title">📷 Evidencia de fallas</div>${evidenciasHtml}` : ""}
+  `;
+
+  preopModalBody.querySelectorAll(".preop-evid-input").forEach((input) => {
+    input.addEventListener("change", async () => {
+      const file = input.files?.[0];
+      input.value = "";
+      if (!file) return;
+      const campo = input.closest(".preop-evidencia-block").getAttribute("data-campo");
+      try {
+        showToast("Subiendo foto…", "ok");
+        const fd = new FormData();
+        fd.set("preoperacional_id", p.id);
+        fd.set("campo", campo);
+        fd.set("file", file);
+        await callFnUpload("subir_evidencia_preoperacional", fd);
+        await cargarPreoperacionales();
+        abrirPreopDetalle(p.id);
+        showToast("Foto guardada.", "ok");
+      } catch (err) {
+        showToast(err.message || "No se pudo subir la foto.", "err");
+      }
+    });
+  });
+
+  preopModal.classList.remove("hidden");
+}
+
+btnNuevoPreop.addEventListener("click", abrirPreopForm);
+buscarPreop.addEventListener("input", renderPreopList);
+document.getElementById("preopFiltrosFecha").querySelectorAll(".preop-filtro").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.getElementById("preopFiltrosFecha").querySelectorAll(".preop-filtro").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    preopRangoActivo = btn.getAttribute("data-rango");
+    cargarPreoperacionales();
+  });
+});
+document.getElementById("preopFiltrosEstado").querySelectorAll(".preop-filtro").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.getElementById("preopFiltrosEstado").querySelectorAll(".preop-filtro").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    preopEstadoActivo = btn.getAttribute("data-estado");
+    renderPreopList();
+  });
+});
+
+btnExportarPreopPdf.addEventListener("click", () => {
+  const filas = preopFilasFiltradas();
+  if (!filas.length) { showToast("No hay filas para exportar con este filtro.", "warn"); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const margin = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const colFallas = margin + 340;
+  let y = margin;
+
+  doc.setFontSize(14);
+  doc.text(`Checklist Preoperacional · ${(currentData?.rutas || []).join(", ")}`, margin, y);
+  y += 18;
+  doc.setFontSize(9);
+  doc.text(`Generado: ${new Date().toLocaleString("es-CO")}`, margin, y);
+  y += 24;
+
+  doc.setFontSize(9.5);
+  doc.setFont(undefined, "bold");
+  doc.text("Fecha", margin, y);
+  doc.text("Placa", margin + 60, y);
+  doc.text("Interno", margin + 115, y);
+  doc.text("Conductor", margin + 170, y);
+  doc.text("Estado", margin + 280, y);
+  doc.text("Fallas", colFallas, y);
+  doc.setFont(undefined, "normal");
+  y += 6;
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 14;
+
+  filas.forEach((p) => {
+    const textoFallas = fallasDe(p).map((f) => `${f.item.label}: ${f.valor}`).join("; ") || "—";
+    const lineasFallas = doc.splitTextToSize(textoFallas, pageWidth - margin - colFallas);
+    const alturaFila = Math.max(14, lineasFallas.length * 11);
+    if (y + alturaFila > pageHeight - margin) { doc.addPage(); y = margin; }
+    doc.text(fmtFecha(p.fecha), margin, y);
+    doc.text(String(p.placa || "—"), margin + 60, y);
+    doc.text(String(p.interno || "—"), margin + 115, y);
+    doc.text(String(p.conductor_nombre || "—").slice(0, 22), margin + 170, y);
+    doc.text(badgeEstado(p.estado_general), margin + 280, y);
+    doc.text(lineasFallas, colFallas, y);
+    y += alturaFila + 6;
+  });
+
+  const ruta = ((currentData?.rutas || [])[0] || "ruta").replace(/[^\w-]+/g, "_");
+  doc.save(`preoperacional_${ruta}_${hoyISO()}.pdf`);
 });
 
 // ---------------- Arranque ----------------

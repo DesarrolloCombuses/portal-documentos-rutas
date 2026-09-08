@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.6.0" />
+<link rel="stylesheet" href="css/styles.css?v=1.7.0" />
 </head>
 <body>
 
@@ -54,6 +54,7 @@
       <button class="section-tab" data-section="conductores">Conductores</button>
       <button class="section-tab" data-section="programacion">🔧 Programación</button>
       <button class="section-tab" data-section="escaneo">📷 Escaneo de tarjetas</button>
+      <button class="section-tab" data-section="preoperacional">✅ Preoperacional</button>
     </nav>
 
     <section id="secVehiculos" class="section">
@@ -100,6 +101,29 @@
       <div class="muted scan-hint">Las fotos de las tarjetas de despacho de este día se guardan aquí. Cuando termines el turno, genera el PDF con todas juntas.</div>
       <div id="escaneosGrid" class="scan-grid"></div>
     </section>
+
+    <section id="secPreoperacional" class="section hidden">
+      <div class="preop-toolbar">
+        <button class="btn btn-primary" id="btnNuevoPreop">+ Nuevo checklist</button>
+        <input type="search" id="buscarPreop" placeholder="Buscar por placa, interno o conductor…" />
+        <button class="btn btn-ghost" id="btnExportarPreopPdf">📄 Exportar PDF</button>
+      </div>
+      <div class="preop-filtros-row">
+        <div class="preop-filtros" id="preopFiltrosFecha">
+          <button class="preop-filtro active" data-rango="hoy">Hoy</button>
+          <button class="preop-filtro" data-rango="7">Últimos 7 días</button>
+          <button class="preop-filtro" data-rango="30">Últimos 30 días</button>
+          <button class="preop-filtro" data-rango="todas">Todas</button>
+        </div>
+        <div class="preop-filtros" id="preopFiltrosEstado">
+          <button class="preop-filtro active" data-estado="todas">Todos</button>
+          <button class="preop-filtro" data-estado="OK">🟢 OK</button>
+          <button class="preop-filtro" data-estado="ALERTA">🟡 Alerta</button>
+          <button class="preop-filtro" data-estado="CRITICO">🔴 Crítico</button>
+        </div>
+      </div>
+      <div id="preopList" class="preop-list"></div>
+    </section>
   </main>
 </div>
 
@@ -113,11 +137,21 @@
   </div>
 </div>
 
+<div id="preopModal" class="modal-overlay hidden">
+  <div class="modal-box modal-box-lg">
+    <div class="modal-head">
+      <h3 id="preopModalTitle">Checklist preoperacional</h3>
+      <button class="modal-close" id="preopModalClose">✕</button>
+    </div>
+    <div id="preopModalBody" class="modal-body"></div>
+  </div>
+</div>
+
 <div id="toast" class="toast hidden"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="js/app.js?v=1.6.0"></script>
-<script src="js/pwa.js?v=1.6.0"></script>
+<script src="js/app.js?v=1.7.0"></script>
+<script src="js/pwa.js?v=1.7.0"></script>
 </body>
 </html>
