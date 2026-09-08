@@ -761,12 +761,14 @@ function abrirModalVehiculo(placa){
         <div class="doc-row-hint fecha-hint">Indica el día en que se hizo la bimensual — la próxima se programa sola, 2 meses después.</div>
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
+          <button class="btn btn-sm btn-ghost btn-ver-historial">📜 Ver historial</button>
           <input type="date" class="fecha-venc" data-preventivo="1" title="Fecha" />
           <label class="doc-file-label">📎 <span class="file-txt">Foto (opcional)</span>
             <input type="file" class="file-input" accept="application/pdf,image/*" />
           </label>
           <button class="btn btn-primary btn-sm btn-subir">✅ Registrar bimensual</button>
-        </div>`
+        </div>
+        <div class="doc-row-historial hidden"></div>`
       : `
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
@@ -804,6 +806,36 @@ function abrirModalVehiculo(placa){
         showToast(err.message || "No se pudo enviar la solicitud.", "err");
         btn.disabled = false;
         btn.textContent = "📸 Pedir foto al conductor";
+      }
+    });
+  });
+
+  docModalBody.querySelectorAll(".btn-ver-historial").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const row = btn.closest(".doc-row");
+      const tipo = row.getAttribute("data-tipo");
+      const historialEl = row.querySelector(".doc-row-historial");
+      if (!historialEl.classList.contains("hidden")) {
+        historialEl.classList.add("hidden");
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Cargando…";
+      try {
+        const { historial } = await callFn("historial_documento", { placa: v.placa, tipo });
+        historialEl.innerHTML = !historial.length
+          ? `<div class="muted" style="padding:6px 0">Todavía no hay registros anteriores.</div>`
+          : `<div class="doc-historial-titulo">📜 Historial de bimensuales</div>` + historial.map((h) => `
+              <div class="doc-historial-item">
+                <span>${h.fecha_vencimiento ? fmtFecha(h.fecha_vencimiento) : "Sin fecha"}</span>
+                <span class="muted">${new Date(h.created_at).toLocaleDateString("es-CO")}${h.subido_por_conductor ? " · enviada por el conductor" : ""}</span>
+              </div>`).join("");
+        historialEl.classList.remove("hidden");
+      } catch (err) {
+        showToast(err.message || "No se pudo cargar el historial.", "err");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "📜 Ver historial";
       }
     });
   });

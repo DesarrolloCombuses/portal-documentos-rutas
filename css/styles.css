@@ -252,6 +252,16 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
 .doc-file-label:hover{background:var(--bg-elev)}
 .doc-row input[type="file"]{display:none}
 .doc-row input[type="date"]{max-width:160px}
+.doc-row-historial{
+  margin-top:10px; padding-top:10px; border-top:1px dashed var(--line-strong);
+  display:flex; flex-direction:column; gap:4px;
+}
+.doc-historial-titulo{font-weight:700; font-size:12px; margin-bottom:2px}
+.doc-historial-item{
+  display:flex; justify-content:space-between; gap:10px; font-size:12.5px;
+  padding:4px 0; border-bottom:1px solid var(--line);
+}
+.doc-historial-item:last-child{border-bottom:none}
 .doc-sin-archivo{color:var(--warn); font-style:italic}
 
 /* ---- Toast ---- */
