@@ -5,9 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Checklist Preoperacional · Combuses</title>
 <meta name="theme-color" content="#0078d4" />
+<link rel="manifest" href="manifest-preoperacional.webmanifest" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.9.1" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Preoperacional" />
+<link rel="stylesheet" href="css/styles.css?v=1.9.2" />
 </head>
 <body>
 
@@ -17,6 +22,7 @@
       <div class="auth-logo">🚌✅</div>
       <h1>Checklist Preoperacional</h1>
       <p class="auth-sub">Combuses · Zamora y Aranjuez - Guadalupe</p>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnAyuda">❓ ¿Cómo funciona?</button>
     </div>
 
     <div id="publicFormWrap">
@@ -32,18 +38,25 @@
           </select>
         </div>
         <div class="preop-form-field">
+          <label>Cédula del conductor *</label>
+          <input type="text" inputmode="numeric" id="pubCedula" placeholder="Escribe tu número de cédula" required autocomplete="off" />
+          <span class="preop-field-hint">Escribe tu cédula y tu nombre aparece solo.</span>
+        </div>
+        <div class="preop-form-field" id="pubConductorWrap">
           <label>Nombre del conductor *</label>
           <input type="text" id="pubConductor" list="pubConductoresList" placeholder="Escribe tu nombre completo" required autocomplete="off" />
           <datalist id="pubConductoresList"></datalist>
         </div>
         <div class="preop-form-field">
-          <label>Cédula *</label>
-          <input type="text" inputmode="numeric" id="pubCedula" placeholder="Tu número de cédula" required autocomplete="off" />
-        </div>
-        <div class="preop-form-field">
           <label>Kilometraje del vehículo *</label>
           <input type="number" inputmode="numeric" min="0" id="pubKilometraje" placeholder="Ej. 152340" required />
         </div>
+      </div>
+
+      <div class="preop-conductor-confirmado hidden" id="pubConductorConfirmado">
+        <span class="preop-conductor-confirmado-check">✅</span>
+        <span class="preop-conductor-confirmado-nombre" id="pubConductorConfirmadoNombre"></span>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnCambiarConductor">✏️ No soy yo, cambiar</button>
       </div>
 
       <div id="pubSecciones"></div>
@@ -69,8 +82,27 @@
   </div>
 </div>
 
+<div id="tutorialModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3>📋 Cómo llenar el checklist</h3>
+      <button class="modal-close" id="tutorialClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <ol class="preop-tutorial-steps">
+        <li><b>1. Busca tu vehículo</b><br />Escribe la placa o el número interno y selecciónalo.</li>
+        <li><b>2. Escribe tu cédula</b><br />Tu nombre aparece solo. Si no aparece, escríbelo tú mismo.</li>
+        <li><b>3. Marca cada verificación</b><br />🟢 OK &nbsp;·&nbsp; 🟡 Alerta &nbsp;·&nbsp; 🔴 Falla. Son solo 9, toma menos de 3 minutos.</li>
+        <li><b>4. Guarda</b><br />Si marcaste alguna falla, puedes agregar una foto como evidencia.</li>
+      </ol>
+      <button class="btn btn-primary btn-block" id="btnTutorialEntendido">Entendido, empezar</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast hidden"></div>
 
-<script src="js/preoperacional-publico.js?v=1.9.1"></script>
+<script src="js/preoperacional-publico.js?v=1.9.2"></script>
+<script src="js/pwa.js?v=1.9.2"></script>
 </body>
 </html>

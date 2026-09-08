@@ -10,10 +10,18 @@ const FUNCTION_URL = "https://cbplebkmxrkaafqdhiyi.supabase.co/functions/v1/preo
 
 const pubFiltroVehiculo = document.getElementById("pubFiltroVehiculo");
 const pubPlaca = document.getElementById("pubPlaca");
+const pubConductorWrap = document.getElementById("pubConductorWrap");
 const pubConductor = document.getElementById("pubConductor");
 const pubConductoresList = document.getElementById("pubConductoresList");
+const pubConductorConfirmado = document.getElementById("pubConductorConfirmado");
+const pubConductorConfirmadoNombre = document.getElementById("pubConductorConfirmadoNombre");
+const btnCambiarConductor = document.getElementById("btnCambiarConductor");
 const pubCedula = document.getElementById("pubCedula");
 const pubKilometraje = document.getElementById("pubKilometraje");
+const btnAyuda = document.getElementById("btnAyuda");
+const tutorialModal = document.getElementById("tutorialModal");
+const tutorialClose = document.getElementById("tutorialClose");
+const btnTutorialEntendido = document.getElementById("btnTutorialEntendido");
 const pubSecciones = document.getElementById("pubSecciones");
 const pubCombustible = document.getElementById("pubCombustible");
 const pubObservaciones = document.getElementById("pubObservaciones");
@@ -162,23 +170,54 @@ async function cargarCatalogo(){
 }
 cargarCatalogo();
 
+// Cuando encontramos al conductor (por cédula o por nombre) lo mostramos en
+// grande y bloqueamos el campo de nombre para que no se pueda editar por
+// error -- si Sonar lo reconoce, ese es su nombre oficial. "No soy yo" lo
+// desbloquea de nuevo por si la cédula quedó mal escrita.
+function bloquearConductor(nombre, cedula){
+  pubConductor.value = nombre;
+  if (cedula) pubCedula.value = cedula;
+  pubConductorWrap.classList.add("hidden");
+  pubConductorConfirmadoNombre.textContent = nombre;
+  pubConductorConfirmado.classList.remove("hidden");
+}
+function desbloquearConductor(){
+  pubConductorConfirmado.classList.add("hidden");
+  pubConductorWrap.classList.remove("hidden");
+  pubConductor.value = "";
+  pubCedula.value = "";
+  pubCedula.focus();
+}
+btnCambiarConductor.addEventListener("click", desbloquearConductor);
+
 // Si el nombre escrito coincide con un conductor conocido, autocompleta la
-// cédula para ahorrarle el tecleo (sigue siendo editable).
+// cédula y confirma (sigue pudiendo desbloquearse con "No soy yo").
 pubConductor.addEventListener("change", () => {
-  if (pubCedula.value.trim()) return;
   const match = conductores.find((c) => (c.nombre || "").trim().toLowerCase() === pubConductor.value.trim().toLowerCase());
-  if (match?.cedula) pubCedula.value = match.cedula;
+  if (match?.cedula) bloquearConductor(match.nombre, match.cedula);
 });
 
-// Al revés: si escriben primero la cédula, busca al conductor por cédula y
-// autocompleta el nombre (antes solo funcionaba nombre -> cédula).
+// Flujo principal: escriben primero la cédula, buscamos al conductor por
+// cédula y confirmamos su nombre automáticamente.
 pubCedula.addEventListener("change", () => {
-  if (pubConductor.value.trim()) return;
   const cedula = pubCedula.value.trim();
   if (!cedula) return;
   const match = conductores.find((c) => (c.cedula || "").trim() === cedula);
-  if (match?.nombre) pubConductor.value = match.nombre;
+  if (match?.nombre) bloquearConductor(match.nombre, match.cedula);
 });
+
+// ---------------- Mini-tutorial ----------------
+function abrirTutorial(){ tutorialModal.classList.remove("hidden"); }
+function cerrarTutorial(){
+  tutorialModal.classList.add("hidden");
+  try { localStorage.setItem("preop_tutorial_visto", "1"); } catch (_) {}
+}
+btnAyuda.addEventListener("click", abrirTutorial);
+tutorialClose.addEventListener("click", cerrarTutorial);
+btnTutorialEntendido.addEventListener("click", cerrarTutorial);
+let tutorialYaVisto = false;
+try { tutorialYaVisto = localStorage.getItem("preop_tutorial_visto") === "1"; } catch (_) {}
+if (!tutorialYaVisto) abrirTutorial();
 
 // ---------------- Guardar ----------------
 btnGuardarPublico.addEventListener("click", async () => {
@@ -288,8 +327,7 @@ btnOtroChecklist.addEventListener("click", () => {
   publicExito.classList.add("hidden");
   publicFormWrap.classList.remove("hidden");
   pubPlaca.value = "";
-  pubConductor.value = "";
-  pubCedula.value = "";
+  desbloquearConductor();
   pubKilometraje.value = "";
   pubFiltroVehiculo.value = "";
   pubObservaciones.value = "";
