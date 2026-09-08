@@ -72,6 +72,7 @@ const inputEscanearGaleria = document.getElementById("inputEscanearGaleria");
 const btnElegirGaleria = document.getElementById("btnElegirGaleria");
 const btnGenerarPdf = document.getElementById("btnGenerarPdf");
 const escaneosGrid = document.getElementById("escaneosGrid");
+const scanContador = document.getElementById("scanContador");
 const btnNuevoPreop = document.getElementById("btnNuevoPreop");
 const btnCopiarLinkPublico = document.getElementById("btnCopiarLinkPublico");
 const buscarPreop = document.getElementById("buscarPreop");
@@ -1159,6 +1160,7 @@ async function cargarEscaneos(){
 }
 
 function renderEscaneos(){
+  scanContador.textContent = `${escaneosActuales.length} foto${escaneosActuales.length === 1 ? "" : "s"}`;
   if (!escaneosActuales.length) {
     escaneosGrid.innerHTML = `<div class="empty-state">Sin tarjetas escaneadas este día todavía.</div>`;
     return;
@@ -1240,6 +1242,7 @@ function imagenAJpegDataUrl(img, maxDim, calidad){
 
 btnGenerarPdf.addEventListener("click", async () => {
   if (!escaneosActuales.length) { showToast("No hay tarjetas escaneadas este día para generar el PDF.", "warn"); return; }
+  if (!window.confirm(`Se va a generar el PDF con ${escaneosActuales.length} foto(s) y luego se vaciará el visor para el siguiente turno. ¿Continuar?`)) return;
   btnGenerarPdf.disabled = true;
   btnGenerarPdf.textContent = "Generando…";
   try {
@@ -1248,6 +1251,7 @@ btnGenerarPdf.addEventListener("click", async () => {
     const pageW = doc.internal.pageSize.getWidth();
     const pageH = doc.internal.pageSize.getHeight();
     const margen = 24;
+    const generadoEl = new Date().toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" });
 
     for (let i = 0; i < escaneosActuales.length; i++) {
       const img = await loadImage(escaneosActuales[i].url);
@@ -1259,10 +1263,23 @@ btnGenerarPdf.addEventListener("click", async () => {
       const outW = w * ratio;
       const outH = h * ratio;
       doc.addImage(dataUrl, "JPEG", (pageW - outW) / 2, (pageH - outH) / 2, outW, outH);
+      doc.setFontSize(8);
+      doc.setTextColor(120);
+      doc.text(`Generado: ${generadoEl}`, margen, pageH - 10);
+      doc.text(`${i + 1} / ${escaneosActuales.length}`, pageW - margen, pageH - 10, { align: "right" });
     }
 
     const ruta = ((currentData?.rutas || [])[0] || "ruta").replace(/[^\w-]+/g, "_");
     doc.save(`tarjetas_despacho_${ruta}_${fechaEscaneo.value}.pdf`);
+
+    // Una vez generado el PDF, se vacia el visor de este dia para que el
+    // siguiente turno empiece de cero (ya quedo todo junto en el PDF).
+    btnGenerarPdf.textContent = "Vaciando visor…";
+    for (const e of escaneosActuales) {
+      await callFn("eliminar_escaneo", { id: e.id });
+    }
+    await cargarEscaneos();
+    showToast("PDF generado y visor vaciado.", "ok");
   } catch (err) {
     showToast(err.message || "No se pudo generar el PDF.", "err");
   } finally {

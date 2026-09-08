@@ -8,7 +8,11 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.11.3" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Docs Ruta" />
+<link rel="stylesheet" href="css/styles.css?v=1.11.4" />
 </head>
 <body>
 
@@ -100,8 +104,9 @@
         <button class="btn btn-ghost" id="btnElegirGaleria">🖼 Elegir de galería</button>
         <input type="file" id="inputEscanearGaleria" accept="image/*" multiple class="hidden" />
         <button class="btn btn-primary" id="btnGenerarPdf">📄 Generar PDF del día</button>
+        <span class="scan-contador" id="scanContador">0 fotos</span>
       </div>
-      <div class="muted scan-hint">Las fotos de las tarjetas de despacho de este día se guardan aquí. Cuando termines el turno, genera el PDF con todas juntas.</div>
+      <div class="muted scan-hint">Las fotos de las tarjetas de despacho de este día se guardan aquí. Al generar el PDF, el visor se vacía para el siguiente turno.</div>
       <div id="escaneosGrid" class="scan-grid"></div>
     </section>
 
@@ -201,8 +206,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="js/conectividad.js?v=1.11.3"></script>
-<script src="js/app.js?v=1.11.3"></script>
-<script src="js/pwa.js?v=1.11.3"></script>
+<script src="js/conectividad.js?v=1.11.4"></script>
+<script src="js/app.js?v=1.11.4"></script>
+<script src="js/pwa.js?v=1.11.4"></script>
 </body>
 </html>
