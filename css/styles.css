@@ -161,6 +161,13 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
   color:var(--fg-muted); width:100%; margin-bottom:2px;
 }
 .prog-fecha-hint{font-size:11px; color:var(--fg-soft); font-style:italic}
+.prog-modo-aviso{
+  font-size:12px; border-radius:8px; padding:8px 10px; margin-bottom:8px; line-height:1.4;
+}
+.prog-modo-aviso-hecha{background:var(--ok-soft); color:#14532d}
+.prog-modo-aviso-reprogramar{background:var(--warn-soft); color:#78350f}
+.btn-reprogramar{background:var(--warn); color:#fff; border-color:transparent}
+.btn-reprogramar:hover{filter:brightness(0.95)}
 
 .alert-row-sub{color:var(--fg-soft); font-size:12px; font-weight:400}
 .alert-row-fecha{display:flex; align-items:center; gap:8px; white-space:nowrap}
@@ -250,7 +257,7 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
   border:1px dashed var(--line-strong); font-size:12px; cursor:pointer; color:var(--fg-muted);
 }
 .doc-file-label:hover{background:var(--bg-elev)}
-.doc-row input[type="file"]{display:none}
+.doc-row input[type="file"], .doc-file-label input[type="file"]{display:none}
 .doc-row input[type="date"]{max-width:160px}
 .doc-row-historial{
   margin-top:10px; padding-top:10px; border-top:1px dashed var(--line-strong);
@@ -258,8 +265,8 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
 }
 .doc-historial-titulo{font-weight:700; font-size:12px; margin-bottom:2px}
 .doc-historial-item{
-  display:flex; justify-content:space-between; gap:10px; font-size:12.5px;
-  padding:4px 0; border-bottom:1px solid var(--line);
+  display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12.5px;
+  flex-wrap:wrap; padding:4px 0; border-bottom:1px solid var(--line);
 }
 .doc-historial-item:last-child{border-bottom:none}
 .doc-sin-archivo{color:var(--warn); font-style:italic}
