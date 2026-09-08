@@ -56,6 +56,9 @@ const preopModal = document.getElementById("preopModal");
 const preopModalTitle = document.getElementById("preopModalTitle");
 const preopModalBody = document.getElementById("preopModalBody");
 const preopModalClose = document.getElementById("preopModalClose");
+const preopFechaCumplimiento = document.getElementById("preopFechaCumplimiento");
+const preopCumplimientoResumen = document.getElementById("preopCumplimientoResumen");
+const preopCumplimientoList = document.getElementById("preopCumplimientoList");
 
 let currentData = null;
 let escaneosActuales = [];
@@ -64,6 +67,7 @@ let preopActuales = [];
 let preopEvidencias = [];
 let preopRangoActivo = "hoy";
 let preopEstadoActivo = "todas";
+let cumplimientoData = { preoperacionales: [], ausencias: [], evidencias: [] };
 let toastTimer = null;
 
 // ---------------- Checklist preoperacional: catálogo de items ----------------
@@ -733,7 +737,7 @@ document.querySelectorAll(".section-tab").forEach((tab) => {
     secPreoperacional.classList.toggle("hidden", target !== "preoperacional");
     if (target === "programacion") renderProgramacion();
     if (target === "escaneo") cargarEscaneos();
-    if (target === "preoperacional") cargarPreoperacionales();
+    if (target === "preoperacional") { cargarPreoperacionales(); cargarCumplimiento(); }
   });
 });
 buscarVehiculo.addEventListener("input", renderVehiculos);
@@ -1060,7 +1064,7 @@ async function guardarPreopDesdeForm(){
   try {
     const { preoperacional, alertas } = await callFn("guardar_preoperacional", payload);
     showToast("Checklist guardado.", "ok");
-    await cargarPreoperacionales();
+    await Promise.all([cargarPreoperacionales(), cargarCumplimiento()]);
     if (alertas && alertas.length) {
       abrirPreopDetalle(preoperacional.id);
     } else {
@@ -1073,8 +1077,20 @@ async function guardarPreopDesdeForm(){
   }
 }
 
+// El detalle se puede abrir desde el Historial (preopActuales) o desde el panel
+// de Cumplimiento del día (cumplimientoData, que puede ser un día distinto al
+// que muestra el historial) -- se busca en ambos.
+function buscarPreopPorId(id){
+  return preopActuales.find((x) => x.id === id) || (cumplimientoData.preoperacionales || []).find((x) => x.id === id) || null;
+}
+function evidenciasDePreop(preopId){
+  const map = new Map();
+  [...preopEvidencias, ...(cumplimientoData.evidencias || [])].forEach((e) => map.set(e.id, e));
+  return [...map.values()].filter((e) => e.preoperacional_id === preopId);
+}
+
 function abrirPreopDetalle(id){
-  const p = preopActuales.find((x) => x.id === id);
+  const p = buscarPreopPorId(id);
   if (!p) return;
   preopModalTitle.textContent = `${p.placa} · ${fmtFecha(p.fecha)}`;
 
@@ -1090,7 +1106,7 @@ function abrirPreopDetalle(id){
 
   const fallas = fallasDe(p);
   const evidenciasPorCampo = {};
-  preopEvidencias.filter((e) => e.preoperacional_id === p.id).forEach((e) => {
+  evidenciasDePreop(p.id).forEach((e) => {
     (evidenciasPorCampo[e.campo] = evidenciasPorCampo[e.campo] || []).push(e);
   });
 
@@ -1133,7 +1149,7 @@ function abrirPreopDetalle(id){
         fd.set("campo", campo);
         fd.set("file", file);
         await callFnUpload("subir_evidencia_preoperacional", fd);
-        await cargarPreoperacionales();
+        await Promise.all([cargarPreoperacionales(), cargarCumplimiento()]);
         abrirPreopDetalle(p.id);
         showToast("Foto guardada.", "ok");
       } catch (err) {
@@ -1212,6 +1228,104 @@ btnExportarPreopPdf.addEventListener("click", () => {
   const ruta = ((currentData?.rutas || [])[0] || "ruta").replace(/[^\w-]+/g, "_");
   doc.save(`preoperacional_${ruta}_${hoyISO()}.pdf`);
 });
+
+// ---------------- Cumplimiento del día (quién hizo / no hizo el preoperacional) ----------------
+preopFechaCumplimiento.value = hoyISO();
+
+async function cargarCumplimiento(){
+  const fecha = preopFechaCumplimiento.value || hoyISO();
+  try {
+    const { preoperacionales, ausencias, evidencias } = await callFn("listar_preoperacionales", { desde: fecha, hasta: fecha });
+    cumplimientoData = { preoperacionales: preoperacionales || [], ausencias: ausencias || [], evidencias: evidencias || [] };
+    renderCumplimiento();
+  } catch (err) {
+    showToast(err.message || "No se pudo cargar el cumplimiento del día.", "err");
+  }
+}
+
+async function guardarJustificacion(btn, placa, fecha, motivo){
+  if (!motivo) { showToast("Escribe el motivo antes de guardar.", "err"); return; }
+  btn.disabled = true;
+  try {
+    await callFn("justificar_ausencia_preoperacional", { placa, fecha, motivo });
+    showToast("Motivo guardado.", "ok");
+    await cargarCumplimiento();
+  } catch (err) {
+    showToast(err.message || "No se pudo guardar el motivo.", "err");
+    btn.disabled = false;
+  }
+}
+
+function renderCumplimiento(){
+  const fecha = preopFechaCumplimiento.value || hoyISO();
+  const vehiculos = (currentData?.vehiculos || []).slice().sort((a, b) => a.placa.localeCompare(b.placa));
+
+  const hechoPorPlaca = {};
+  cumplimientoData.preoperacionales.forEach((p) => { if (p.fecha === fecha) hechoPorPlaca[p.placa] = p; });
+  const justificadoPorPlaca = {};
+  cumplimientoData.ausencias.forEach((a) => { if (a.fecha === fecha) justificadoPorPlaca[a.placa] = a; });
+
+  let nHechos = 0, nJustificados = 0, nPendientes = 0;
+
+  const filas = vehiculos.map((v) => {
+    const p = hechoPorPlaca[v.placa];
+    if (p) {
+      nHechos++;
+      const hora = p.created_at ? new Date(p.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "";
+      return `
+        <div class="cumpl-row cumpl-ok" data-id="${escapeHtml(p.id)}">
+          <div class="cumpl-row-main">
+            <span>✅ ${escapeHtml(v.placa)} <span class="preop-row-sub">Interno ${escapeHtml(v.interno || "—")}</span></span>
+            <span class="preop-row-sub">Hecho${hora ? ` · ${escapeHtml(hora)}` : ""}</span>
+          </div>
+        </div>`;
+    }
+    const a = justificadoPorPlaca[v.placa];
+    if (a) nJustificados++; else nPendientes++;
+    return `
+      <div class="cumpl-row ${a ? "cumpl-justificado" : "cumpl-pendiente"}" data-placa="${escapeHtml(v.placa)}">
+        <div class="cumpl-row-main">
+          <span>${a ? "📝" : "❌"} ${escapeHtml(v.placa)} <span class="preop-row-sub">Interno ${escapeHtml(v.interno || "—")}</span></span>
+          ${a ? `<span class="cumpl-motivo">${escapeHtml(a.motivo)}</span>` : ""}
+          <button class="btn btn-sm ${a ? "btn-ghost" : "btn-primary"} cumpl-btn-toggle">${a ? "✏ Editar motivo" : "📝 Justificar"}</button>
+        </div>
+        <div class="cumpl-row-inline hidden">
+          <textarea class="cumpl-motivo-input" rows="2" placeholder="¿Por qué este vehículo no hizo el preoperacional? (ej. en taller, no operó, novedad del conductor…)">${escapeHtml(a?.motivo || "")}</textarea>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <button class="btn btn-primary btn-sm cumpl-btn-guardar">Guardar</button>
+            <button class="btn btn-ghost btn-sm cumpl-btn-cancelar">Cancelar</button>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  preopCumplimientoResumen.innerHTML = `
+    <span class="summary-chip chip-ok"><span class="n">${nHechos}</span> hicieron</span>
+    <span class="summary-chip chip-warn"><span class="n">${nJustificados}</span> justificados</span>
+    <span class="summary-chip chip-err"><span class="n">${nPendientes}</span> pendientes</span>
+  `;
+  preopCumplimientoList.innerHTML = filas || `<div class="empty-state">No hay vehículos en tu ruta.</div>`;
+
+  preopCumplimientoList.querySelectorAll(".cumpl-ok").forEach((el) => {
+    el.addEventListener("click", () => abrirPreopDetalle(el.getAttribute("data-id")));
+  });
+  preopCumplimientoList.querySelectorAll(".cumpl-btn-toggle").forEach((btn) => {
+    btn.addEventListener("click", () => btn.closest(".cumpl-row").querySelector(".cumpl-row-inline").classList.toggle("hidden"));
+  });
+  preopCumplimientoList.querySelectorAll(".cumpl-btn-cancelar").forEach((btn) => {
+    btn.addEventListener("click", () => btn.closest(".cumpl-row-inline").classList.add("hidden"));
+  });
+  preopCumplimientoList.querySelectorAll(".cumpl-btn-guardar").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const row = btn.closest(".cumpl-row");
+      const placa = row.getAttribute("data-placa");
+      const motivo = row.querySelector(".cumpl-motivo-input").value.trim();
+      guardarJustificacion(btn, placa, fecha, motivo);
+    });
+  });
+}
+
+preopFechaCumplimiento.addEventListener("change", cargarCumplimiento);
 
 // ---------------- Arranque ----------------
 (async function init(){

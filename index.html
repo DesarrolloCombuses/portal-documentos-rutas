@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.7.0" />
+<link rel="stylesheet" href="css/styles.css?v=1.8.0" />
 </head>
 <body>
 
@@ -103,6 +103,16 @@
     </section>
 
     <section id="secPreoperacional" class="section hidden">
+      <div class="preop-cumplimiento">
+        <div class="preop-cumplimiento-head">
+          <b>📋 Cumplimiento del día</b>
+          <input type="date" id="preopFechaCumplimiento" />
+        </div>
+        <div id="preopCumplimientoResumen" class="preop-cumplimiento-resumen"></div>
+        <div id="preopCumplimientoList" class="preop-cumplimiento-list"></div>
+      </div>
+
+      <div class="preop-section-title">📜 Historial</div>
       <div class="preop-toolbar">
         <button class="btn btn-primary" id="btnNuevoPreop">+ Nuevo checklist</button>
         <input type="search" id="buscarPreop" placeholder="Buscar por placa, interno o conductor…" />
@@ -151,7 +161,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="js/app.js?v=1.7.0"></script>
-<script src="js/pwa.js?v=1.7.0"></script>
+<script src="js/app.js?v=1.8.0"></script>
+<script src="js/pwa.js?v=1.8.0"></script>
 </body>
 </html>
