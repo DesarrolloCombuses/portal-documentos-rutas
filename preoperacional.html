@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Checklist Preoperacional · Combuses</title>
+<meta name="theme-color" content="#0078d4" />
+<link rel="icon" href="icons/icon-192.svg" />
+<link rel="apple-touch-icon" href="icons/icon-192.svg" />
+<link rel="stylesheet" href="css/styles.css?v=1.8.0" />
+</head>
+<body>
+
+<div class="public-wrap">
+  <div class="public-card">
+    <div class="public-header">
+      <div class="auth-logo">🚌✅</div>
+      <h1>Checklist Preoperacional</h1>
+      <p class="auth-sub">Combuses · Zamora y Aranjuez - Guadalupe</p>
+    </div>
+
+    <div id="publicFormWrap">
+      <div class="preop-form-grid">
+        <div class="preop-form-field">
+          <label>Buscar vehículo</label>
+          <input type="search" id="pubFiltroVehiculo" placeholder="Escribe la placa o el interno…" />
+        </div>
+        <div class="preop-form-field">
+          <label>Vehículo (placa) *</label>
+          <select id="pubPlaca" required>
+            <option value="" disabled selected>Selecciona el vehículo…</option>
+          </select>
+        </div>
+        <div class="preop-form-field">
+          <label>Nombre del conductor *</label>
+          <input type="text" id="pubConductor" list="pubConductoresList" placeholder="Escribe tu nombre completo" required autocomplete="off" />
+          <datalist id="pubConductoresList"></datalist>
+        </div>
+      </div>
+
+      <div id="pubSecciones"></div>
+
+      <div class="preop-section-title">⛽ Combustible y Observaciones</div>
+      <div id="pubCombustible"></div>
+      <div class="preop-form-field" style="margin-bottom:14px">
+        <label>Observaciones</label>
+        <textarea id="pubObservaciones" rows="3" placeholder="Falla, comentario u observación adicional…" style="width:100%;padding:9px 11px;border:1px solid var(--line-strong);border-radius:8px;font-family:inherit"></textarea>
+      </div>
+
+      <div id="pubFormMsg" class="auth-status err"></div>
+      <button class="btn btn-primary btn-block" id="btnGuardarPublico">💾 Guardar checklist</button>
+    </div>
+
+    <div id="publicExito" class="hidden">
+      <div class="public-exito-icon">✅</div>
+      <h2 id="publicExitoTitulo">Checklist guardado</h2>
+      <p class="muted" id="publicExitoSub"></p>
+      <div id="publicEvidenciasWrap"></div>
+      <button class="btn btn-primary btn-block" id="btnOtroChecklist" style="margin-top:16px">📋 Hacer otro checklist</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/preoperacional-publico.js?v=1.8.0"></script>
+</body>
+</html>

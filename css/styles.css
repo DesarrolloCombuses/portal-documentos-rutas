@@ -347,3 +347,18 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
   width:100%; padding:8px 10px; border:1px solid var(--line-strong); border-radius:8px;
   font-family:inherit; font-size:12.5px; resize:vertical; background:var(--bg-elev); color:var(--fg);
 }
+
+/* ---- Link publico del preoperacional (sin login, lo llenan los conductores) ---- */
+.public-wrap{
+  min-height:100vh; display:flex; justify-content:center; padding:24px 16px 60px;
+  background:linear-gradient(160deg, var(--brand-soft), var(--bg));
+}
+.public-card{
+  background:var(--bg-elev); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow-md); padding:28px; width:100%; max-width:640px; height:fit-content;
+}
+.public-header{text-align:center; margin-bottom:22px}
+.public-header h1{margin:2px 0 2px; font-size:20px}
+.public-exito-icon{font-size:48px; text-align:center; margin-bottom:6px}
+#publicExito h2{text-align:center; margin:0 0 4px}
+#publicExito .muted{text-align:center; margin-bottom:6px}

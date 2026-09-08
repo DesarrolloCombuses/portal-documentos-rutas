@@ -49,6 +49,7 @@ const btnElegirGaleria = document.getElementById("btnElegirGaleria");
 const btnGenerarPdf = document.getElementById("btnGenerarPdf");
 const escaneosGrid = document.getElementById("escaneosGrid");
 const btnNuevoPreop = document.getElementById("btnNuevoPreop");
+const btnCopiarLinkPublico = document.getElementById("btnCopiarLinkPublico");
 const buscarPreop = document.getElementById("buscarPreop");
 const btnExportarPreopPdf = document.getElementById("btnExportarPreopPdf");
 const preopList = document.getElementById("preopList");
@@ -1162,6 +1163,15 @@ function abrirPreopDetalle(id){
 }
 
 btnNuevoPreop.addEventListener("click", abrirPreopForm);
+btnCopiarLinkPublico.addEventListener("click", async () => {
+  const link = new URL("preoperacional.html", window.location.href).href;
+  try {
+    await navigator.clipboard.writeText(link);
+    showToast("Link copiado. Compártelo con los conductores.", "ok");
+  } catch {
+    window.prompt("Copia este link y compártelo con los conductores:", link);
+  }
+});
 buscarPreop.addEventListener("input", renderPreopList);
 document.getElementById("preopFiltrosFecha").querySelectorAll(".preop-filtro").forEach((btn) => {
   btn.addEventListener("click", () => {
