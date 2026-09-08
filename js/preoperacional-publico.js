@@ -12,7 +12,6 @@ const pubFiltroVehiculo = document.getElementById("pubFiltroVehiculo");
 const pubPlaca = document.getElementById("pubPlaca");
 const pubConductorWrap = document.getElementById("pubConductorWrap");
 const pubConductor = document.getElementById("pubConductor");
-const pubConductoresList = document.getElementById("pubConductoresList");
 const pubConductorConfirmado = document.getElementById("pubConductorConfirmado");
 const pubConductorConfirmadoNombre = document.getElementById("pubConductorConfirmadoNombre");
 const btnCambiarConductor = document.getElementById("btnCambiarConductor");
@@ -22,6 +21,11 @@ const btnAyuda = document.getElementById("btnAyuda");
 const tutorialModal = document.getElementById("tutorialModal");
 const tutorialClose = document.getElementById("tutorialClose");
 const btnTutorialEntendido = document.getElementById("btnTutorialEntendido");
+const pubErrorModal = document.getElementById("pubErrorModal");
+const pubErrorTitulo = document.getElementById("pubErrorTitulo");
+const pubErrorMensaje = document.getElementById("pubErrorMensaje");
+const pubErrorClose = document.getElementById("pubErrorClose");
+const pubErrorOk = document.getElementById("pubErrorOk");
 const pubSecciones = document.getElementById("pubSecciones");
 const pubCombustible = document.getElementById("pubCombustible");
 const pubObservaciones = document.getElementById("pubObservaciones");
@@ -163,17 +167,33 @@ async function cargarCatalogo(){
     vehiculos = (vs || []).slice().sort((a, b) => a.placa.localeCompare(b.placa));
     conductores = (cs || []).slice().sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
     renderVehiculoOptions();
-    pubConductoresList.innerHTML = conductores.map((c) => `<option value="${escapeHtml(c.nombre)}"></option>`).join("");
   } catch (err) {
     pubFormMsg.textContent = "No se pudo cargar la lista de vehículos. Verifica tu conexión y recarga la página.";
   }
 }
 cargarCatalogo();
 
-// Cuando encontramos al conductor (por cédula o por nombre) lo mostramos en
-// grande y bloqueamos el campo de nombre para que no se pueda editar por
-// error -- si Sonar lo reconoce, ese es su nombre oficial. "No soy yo" lo
-// desbloquea de nuevo por si la cédula quedó mal escrita.
+// ---------------- Modal de error/aviso ----------------
+let pubErrorAlCerrar = null;
+function mostrarError(titulo, mensaje, alCerrar){
+  pubErrorTitulo.textContent = titulo;
+  pubErrorMensaje.textContent = mensaje;
+  pubErrorAlCerrar = alCerrar || null;
+  pubErrorModal.classList.remove("hidden");
+}
+function cerrarError(){
+  pubErrorModal.classList.add("hidden");
+  const cb = pubErrorAlCerrar;
+  pubErrorAlCerrar = null;
+  if (cb) cb();
+}
+pubErrorClose.addEventListener("click", cerrarError);
+pubErrorOk.addEventListener("click", cerrarError);
+
+// El nombre del conductor NUNCA se escribe a mano: es de solo lectura y solo
+// lo llena el sistema cuando la cédula coincide con un conductor real de
+// Sonar (o de la tabla employees, si Sonar falla). Así evitamos nombres mal
+// escritos o inventados en el checklist.
 function bloquearConductor(nombre, cedula){
   pubConductor.value = nombre;
   if (cedula) pubCedula.value = cedula;
@@ -190,20 +210,28 @@ function desbloquearConductor(){
 }
 btnCambiarConductor.addEventListener("click", desbloquearConductor);
 
-// Si el nombre escrito coincide con un conductor conocido, autocompleta la
-// cédula y confirma (sigue pudiendo desbloquearse con "No soy yo").
-pubConductor.addEventListener("change", () => {
-  const match = conductores.find((c) => (c.nombre || "").trim().toLowerCase() === pubConductor.value.trim().toLowerCase());
-  if (match?.cedula) bloquearConductor(match.nombre, match.cedula);
+// Solo números en la cédula.
+pubCedula.addEventListener("input", () => {
+  const soloDigitos = pubCedula.value.replace(/\D+/g, "");
+  if (soloDigitos !== pubCedula.value) pubCedula.value = soloDigitos;
 });
 
-// Flujo principal: escriben primero la cédula, buscamos al conductor por
-// cédula y confirmamos su nombre automáticamente.
+// Único flujo para identificar al conductor: escriben la cédula y se busca
+// en el catálogo. Si no existe, un modal se lo avisa (en vez de dejarlo
+// escribir el nombre a mano).
 pubCedula.addEventListener("change", () => {
   const cedula = pubCedula.value.trim();
   if (!cedula) return;
   const match = conductores.find((c) => (c.cedula || "").trim() === cedula);
-  if (match?.nombre) bloquearConductor(match.nombre, match.cedula);
+  if (match?.nombre) {
+    bloquearConductor(match.nombre, match.cedula);
+    return;
+  }
+  mostrarError(
+    "❌ Cédula no encontrada",
+    `No encontramos ningún conductor registrado con la cédula ${cedula}. Verifica que esté bien escrita o contacta a tu coordinador de ruta.`,
+    () => { pubCedula.value = ""; pubCedula.focus(); }
+  );
 });
 
 // ---------------- Mini-tutorial ----------------

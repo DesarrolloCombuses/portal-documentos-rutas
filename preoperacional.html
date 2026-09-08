@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Preoperacional" />
-<link rel="stylesheet" href="css/styles.css?v=1.9.2" />
+<link rel="stylesheet" href="css/styles.css?v=1.9.3" />
 </head>
 <body>
 
@@ -39,13 +39,13 @@
         </div>
         <div class="preop-form-field">
           <label>Cédula del conductor *</label>
-          <input type="text" inputmode="numeric" id="pubCedula" placeholder="Escribe tu número de cédula" required autocomplete="off" />
-          <span class="preop-field-hint">Escribe tu cédula y tu nombre aparece solo.</span>
+          <input type="text" inputmode="numeric" pattern="[0-9]*" id="pubCedula" placeholder="Escribe tu número de cédula" required autocomplete="off" />
+          <span class="preop-field-hint">Escribe tu cédula completa y tu nombre aparece solo.</span>
         </div>
         <div class="preop-form-field" id="pubConductorWrap">
           <label>Nombre del conductor *</label>
-          <input type="text" id="pubConductor" list="pubConductoresList" placeholder="Escribe tu nombre completo" required autocomplete="off" />
-          <datalist id="pubConductoresList"></datalist>
+          <input type="text" id="pubConductor" placeholder="Aparece aquí al escribir tu cédula" required readonly />
+          <span class="preop-field-hint">Este campo se llena solo, no se puede escribir.</span>
         </div>
         <div class="preop-form-field">
           <label>Kilometraje del vehículo *</label>
@@ -91,7 +91,7 @@
     <div class="modal-body">
       <ol class="preop-tutorial-steps">
         <li><b>1. Busca tu vehículo</b><br />Escribe la placa o el número interno y selecciónalo.</li>
-        <li><b>2. Escribe tu cédula</b><br />Tu nombre aparece solo. Si no aparece, escríbelo tú mismo.</li>
+        <li><b>2. Escribe tu cédula</b><br />Tu nombre aparece solo, no se escribe a mano. Si no aparece, avísale a tu coordinador de ruta.</li>
         <li><b>3. Marca cada verificación</b><br />🟢 OK &nbsp;·&nbsp; 🟡 Alerta &nbsp;·&nbsp; 🔴 Falla. Son solo 9, toma menos de 3 minutos.</li>
         <li><b>4. Guarda</b><br />Si marcaste alguna falla, puedes agregar una foto como evidencia.</li>
       </ol>
@@ -100,9 +100,22 @@
   </div>
 </div>
 
+<div id="pubErrorModal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h3 id="pubErrorTitulo">⚠️ Aviso</h3>
+      <button class="modal-close" id="pubErrorClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="pubErrorMensaje"></p>
+      <button class="btn btn-primary btn-block" id="pubErrorOk">Entendido</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast hidden"></div>
 
-<script src="js/preoperacional-publico.js?v=1.9.2"></script>
-<script src="js/pwa.js?v=1.9.2"></script>
+<script src="js/preoperacional-publico.js?v=1.9.3"></script>
+<script src="js/pwa.js?v=1.9.3"></script>
 </body>
 </html>
