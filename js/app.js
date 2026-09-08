@@ -1017,6 +1017,7 @@ document.querySelectorAll(".section-tab").forEach((tab) => {
   tab.addEventListener("click", () => {
     document.querySelectorAll(".section-tab").forEach((t) => t.classList.remove("active"));
     tab.classList.add("active");
+    tab.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     const target = tab.getAttribute("data-section");
     secVehiculos.classList.toggle("hidden", target !== "vehiculos");
     secConductores.classList.toggle("hidden", target !== "conductores");
