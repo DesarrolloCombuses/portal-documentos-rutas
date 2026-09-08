@@ -221,15 +221,41 @@ pubPlaca.addEventListener("change", async () => {
   pubDocumentosVehiculo.classList.remove("hidden");
   pubDocumentosVehiculo.innerHTML = `<div class="muted" style="font-size:12.5px">Consultando documentos del vehículo…</div>`;
   try {
-    const { documentos } = await callFn("documentos_vehiculo", { placa });
-    renderDocumentosVehiculo(placa, documentos || []);
+    const { documentos, bimensual } = await callFn("documentos_vehiculo", { placa });
+    renderDocumentosVehiculo(placa, documentos || [], bimensual || null);
   } catch (err) {
     pubDocumentosVehiculo.innerHTML = `<div class="muted" style="font-size:12.5px">No se pudo consultar el estado de los documentos.</div>`;
   }
 });
 
-function renderDocumentosVehiculo(placa, documentos){
+// La bimensual es una cita obligatoria (no un papel que renovar), por eso se
+// avisa distinto: solo cuando faltan 7 días o menos (o ya está vencida), con
+// conteo de días, y con la opción de pedirle al coordinador que corra la
+// fecha si el vehículo no puede presentarse.
+function textoDiasBimensual(dias){
+  if (dias < 0) return { icono: "🔴", texto: `Vencida hace ${Math.abs(dias)} día${Math.abs(dias) === 1 ? "" : "s"} — preséntate cuanto antes` };
+  if (dias === 0) return { icono: "🟡", texto: "Es hoy" };
+  if (dias === 1) return { icono: "🟡", texto: "Es mañana" };
+  return { icono: "🟡", texto: `Faltan ${dias} días` };
+}
+
+function renderBimensualAlerta(placa, bimensual){
+  if (!bimensual || bimensual.dias_restantes > 7) return "";
+  const { icono, texto } = textoDiasBimensual(bimensual.dias_restantes);
+  return `
+    <div class="preop-apto-alerta" style="background:var(--warn-soft); color:#78350f" id="pubBimensualAlerta">
+      <div>${icono} <b>Mantenimiento Preventivo (bimensual):</b> ${texto} · ${fmtFechaDoc(bimensual.fecha)}</div>
+      <button type="button" class="btn btn-sm btn-ghost" id="btnNoPuedoBimensual" style="margin-top:8px;font-weight:600">🙋 No puedo presentarme, pedir cambio de fecha</button>
+      <div class="hidden" id="bimensualSolicitudForm" style="margin-top:8px">
+        <textarea id="bimensualMotivo" rows="2" placeholder="Cuéntale a tu coordinador por qué no puede presentarse…" style="width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;font-family:inherit;font-size:16px"></textarea>
+        <button type="button" class="btn btn-primary btn-sm" id="btnEnviarSolicitudBimensual" style="margin-top:6px">Enviar solicitud</button>
+      </div>
+    </div>`;
+}
+
+function renderDocumentosVehiculo(placa, documentos, bimensual){
   pubDocumentosVehiculo.innerHTML = `
+    ${renderBimensualAlerta(placa, bimensual)}
     <div class="preop-section-title" style="margin-top:0">📄 Documentos de este vehículo</div>
     <div class="preop-docs-list">
       ${documentos.map((d) => {
@@ -273,6 +299,30 @@ function renderDocumentosVehiculo(placa, documentos){
         showToast(err.message || "No se pudo enviar la foto.", "err");
       }
     });
+  });
+
+  const btnNoPuedo = document.getElementById("btnNoPuedoBimensual");
+  btnNoPuedo?.addEventListener("click", () => {
+    document.getElementById("bimensualSolicitudForm")?.classList.remove("hidden");
+    btnNoPuedo.classList.add("hidden");
+  });
+  document.getElementById("btnEnviarSolicitudBimensual")?.addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    const motivo = document.getElementById("bimensualMotivo")?.value.trim();
+    if (!motivo) { showToast("Cuéntale a tu coordinador el motivo.", "err"); return; }
+    btn.disabled = true;
+    btn.textContent = "Enviando…";
+    try {
+      await callFn("solicitar_reprogramacion_bimensual", { placa, motivo });
+      const alerta = document.getElementById("pubBimensualAlerta");
+      if (alerta) alerta.insertAdjacentHTML("beforeend", `<div style="margin-top:8px;font-weight:700;color:var(--ok)">✅ Solicitud enviada, tu coordinador la revisará.</div>`);
+      document.getElementById("bimensualSolicitudForm")?.remove();
+      showToast("Solicitud enviada.", "ok");
+    } catch (err) {
+      showToast(err.message || "No se pudo enviar la solicitud.", "err");
+      btn.disabled = false;
+      btn.textContent = "Enviar solicitud";
+    }
   });
 }
 

@@ -27,6 +27,7 @@ const rutaLabel = document.getElementById("rutaLabel");
 const summaryBar = document.getElementById("summaryBar");
 const vehiculosGrid = document.getElementById("vehiculosGrid");
 const docsPendientesConductor = document.getElementById("docsPendientesConductor");
+const solicitudesBimensual = document.getElementById("solicitudesBimensual");
 const conductoresGrid = document.getElementById("conductoresGrid");
 const buscarVehiculo = document.getElementById("buscarVehiculo");
 const buscarConductor = document.getElementById("buscarConductor");
@@ -266,6 +267,7 @@ async function cargarListado(){
     rutaLabel.innerHTML = `Ruta ${escapeHtml(rutas)} <span class="topbar-user">· conectado como <b>${escapeHtml(data.nombre_coordinador || email)}</b>${data.nombre_coordinador ? ` (${escapeHtml(email)})` : ""}</span>`;
     renderResumen();
     renderProgramacion();
+    renderSolicitudesBimensual();
     renderDocumentosPendientes();
     renderVehiculos();
     renderConductores();
@@ -423,6 +425,51 @@ function aplicarFiltroProgramacion(filas){
   if (progFiltroActivo === "7") return filas.filter((f) => f.dias <= 7);
   if (progFiltroActivo === "30") return filas.filter((f) => f.dias <= 30);
   return filas;
+}
+
+// Solicitudes de conductores para correr la fecha de la bimensual porque el
+// vehiculo no puede presentarse -- se ven aparte, arriba de la lista, para
+// que el coordinador decida y reprograme (con el boton "Registrar" de abajo).
+function renderSolicitudesBimensual(){
+  const solicitudes = currentData?.solicitudes_bimensual || [];
+  if (!solicitudes.length) {
+    solicitudesBimensual.classList.add("hidden");
+    solicitudesBimensual.innerHTML = "";
+    return;
+  }
+  solicitudesBimensual.classList.remove("hidden");
+  solicitudesBimensual.innerHTML = `
+    <div class="doc-row" style="border-color:var(--warn); background:var(--warn-soft); margin-bottom:14px">
+      <div class="doc-row-head">
+        <span class="doc-row-title">🙋 Solicitudes de reprogramación (${solicitudes.length})</span>
+      </div>
+      <div class="doc-row-hint">Un conductor avisó que el vehículo no puede presentarse a su bimensual en la fecha programada. Revisa el motivo y, si aplica, reprográmala desde su fila en la lista de abajo.</div>
+      <div class="preop-docs-list" style="margin-top:8px">
+        ${solicitudes.map((s) => `
+          <div class="preop-doc-row" data-id="${escapeHtml(s.id)}">
+            <div class="preop-doc-row-info">
+              <b>${escapeHtml(s.placa)}${s.fecha_programada ? ` · Programada: ${fmtFecha(s.fecha_programada)}` : ""}</b>
+              <span class="muted">${escapeHtml(s.motivo)}</span>
+            </div>
+            <button class="btn btn-sm btn-primary btn-marcar-solicitud-atendida">✅ Marcar atendida</button>
+          </div>`).join("")}
+      </div>
+    </div>`;
+
+  solicitudesBimensual.querySelectorAll(".btn-marcar-solicitud-atendida").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const solicitudId = btn.closest(".preop-doc-row").getAttribute("data-id");
+      btn.disabled = true;
+      try {
+        await callFn("marcar_solicitud_bimensual_atendida", { solicitud_id: solicitudId });
+        showToast("Marcada como atendida.", "ok");
+        await cargarListado();
+      } catch (err) {
+        showToast(err.message || "No se pudo marcar como atendida.", "err");
+        btn.disabled = false;
+      }
+    });
+  });
 }
 
 function renderProgramacion(){
