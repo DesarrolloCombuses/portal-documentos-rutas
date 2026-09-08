@@ -537,7 +537,14 @@ function renderProgramacion(){
           <button class="btn btn-sm btn-ghost prog-btn-registrar">✅ Registrar</button>
         </div>
         <div class="prog-row-inline hidden">
-          <input type="date" class="prog-fecha-hecha" value="${hoyISO()}" title="Fecha en que se hizo" />
+          <label class="prog-modo-toggle">
+            <input type="checkbox" class="prog-modo-realizada" checked />
+            Ya se hizo (calcula sola la próxima, +2 meses)
+          </label>
+          <div class="prog-modo-campos">
+            <input type="date" class="prog-fecha-hecha" value="${hoyISO()}" />
+            <span class="prog-fecha-hint muted">Fecha en que se hizo</span>
+          </div>
           <button class="btn btn-primary btn-sm prog-btn-confirmar">Guardar</button>
           <button class="btn btn-ghost btn-sm prog-btn-cancelar">Cancelar</button>
         </div>
@@ -557,26 +564,38 @@ function renderProgramacion(){
       btn.closest(".prog-row-inline").classList.add("hidden");
     });
   });
+  // El administrador decide que carro va a preventiva y cual no -- por eso la
+  // fecha no siempre se calcula sola (+2 meses desde hoy). Destildando la
+  // casilla se puede escribir la proxima fecha programada directamente, sin
+  // ninguna cuenta, incluida una fecha anterior a hoy si asi se decidio.
+  progList.querySelectorAll(".prog-modo-realizada").forEach((chk) => {
+    chk.addEventListener("change", () => {
+      const hint = chk.closest(".prog-row-inline").querySelector(".prog-fecha-hint");
+      hint.textContent = chk.checked ? "Fecha en que se hizo" : "Próxima fecha programada (se guarda tal cual)";
+    });
+  });
   progList.querySelectorAll(".prog-btn-confirmar").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const row = btn.closest(".prog-row");
+      const inline = row.querySelector(".prog-row-inline");
       const placa = row.getAttribute("data-placa");
-      const fechaHecha = row.querySelector(".prog-fecha-hecha").value;
-      if (!fechaHecha) { showToast("Indica la fecha en que se hizo.", "err"); return; }
-      const proxima = addMonthsISO(fechaHecha, 2);
+      const fechaInput = inline.querySelector(".prog-fecha-hecha").value;
+      const esRealizada = inline.querySelector(".prog-modo-realizada").checked;
+      if (!fechaInput) { showToast("Indica la fecha.", "err"); return; }
+      const fechaVencimiento = esRealizada ? addMonthsISO(fechaInput, 2) : fechaInput;
       btn.disabled = true;
       btn.textContent = "Guardando…";
       try {
         const fd = new FormData();
         fd.set("placa", placa);
         fd.set("tipo", "MANTENIMIENTO_PREVENTIVO");
-        fd.set("fecha_vencimiento", proxima);
+        fd.set("fecha_vencimiento", fechaVencimiento);
         await callFnUpload("subir_flota", fd);
-        showToast("Bimensual registrada. Próxima programada automáticamente.", "ok");
+        showToast(esRealizada ? "Bimensual registrada. Próxima programada automáticamente." : "Fecha programada actualizada.", "ok");
         await cargarListado();
         renderProgramacion();
       } catch (err) {
-        showToast(err.message || "No se pudo registrar.", "err");
+        showToast(err.message || "No se pudo guardar.", "err");
         btn.disabled = false;
         btn.textContent = "Guardar";
       }
@@ -735,10 +754,14 @@ function abrirModalVehiculo(placa){
       : `<button class="btn btn-sm btn-ghost btn-pedir-foto">📸 Pedir foto al conductor</button>`;
     const accionesHtml = esPreventivo
       ? `
-        <div class="doc-row-hint">Indica el día en que se hizo la bimensual — la próxima se programa sola, 2 meses después.</div>
+        <label class="prog-modo-toggle">
+          <input type="checkbox" class="modo-realizada" checked />
+          Ya se hizo (calcula sola la próxima, +2 meses)
+        </label>
+        <div class="doc-row-hint fecha-hint">Indica el día en que se hizo la bimensual — la próxima se programa sola, 2 meses después.</div>
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
-          <input type="date" class="fecha-venc" data-preventivo="1" title="Fecha en que se realizó" />
+          <input type="date" class="fecha-venc" data-preventivo="1" title="Fecha" />
           <label class="doc-file-label">📎 <span class="file-txt">Foto (opcional)</span>
             <input type="file" class="file-input" accept="application/pdf,image/*" />
           </label>
@@ -838,6 +861,18 @@ function bindDocRowEvents(container, ctx){
       }
     });
   });
+  // El administrador decide que carro va a preventiva y cual no -- por eso no
+  // siempre se calcula sola (+2 meses desde hoy). Destildando la casilla se
+  // puede escribir la proxima fecha programada directamente, incluida una
+  // fecha anterior a hoy si asi se decidio.
+  container.querySelectorAll(".modo-realizada").forEach((chk) => {
+    chk.addEventListener("change", () => {
+      const hint = chk.closest(".doc-row").querySelector(".fecha-hint");
+      if (hint) hint.textContent = chk.checked
+        ? "Indica el día en que se hizo la bimensual — la próxima se programa sola, 2 meses después."
+        : "Escribe directamente la próxima fecha programada (se guarda tal cual, puede ser anterior a hoy).";
+    });
+  });
   container.querySelectorAll(".btn-subir").forEach((btn) => {
     const row0 = btn.closest(".doc-row");
     const textoOriginal = btn.textContent;
@@ -847,9 +882,10 @@ function bindDocRowEvents(container, ctx){
       const esPreventivo = tipo === "MANTENIMIENTO_PREVENTIVO";
       const file = row.querySelector(".file-input").files?.[0];
       let fecha = row.querySelector(".fecha-venc").value || "";
+      const esRealizada = row.querySelector(".modo-realizada")?.checked;
       if (esPreventivo) {
-        if (!fecha) { showToast("Indica la fecha en que se hizo la bimensual.", "err"); return; }
-        fecha = addMonthsISO(fecha, 2);
+        if (!fecha) { showToast("Indica la fecha.", "err"); return; }
+        if (esRealizada) fecha = addMonthsISO(fecha, 2);
       } else if (!file) {
         showToast("Selecciona un archivo antes de subir.", "err");
         return;
@@ -870,7 +906,7 @@ function bindDocRowEvents(container, ctx){
           fd.set("categoria_licencia", categoria);
           await callFnUpload("subir_conductor", fd);
         }
-        showToast(esPreventivo ? "Bimensual registrada. Próxima programada automáticamente." : "Documento subido correctamente.", "ok");
+        showToast(!esPreventivo ? "Documento subido correctamente." : esRealizada ? "Bimensual registrada. Próxima programada automáticamente." : "Fecha programada actualizada.", "ok");
         await cargarListado();
         if (ctx.kind === "flota") abrirModalVehiculo(ctx.placa); else abrirModalConductor(ctx.cedula);
       } catch (err) {

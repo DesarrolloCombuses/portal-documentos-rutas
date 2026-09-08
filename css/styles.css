@@ -147,8 +147,20 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
 .prog-row-main{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
 .prog-row-veh{font-weight:700; font-size:13.5px; cursor:pointer}
 .prog-row-veh:hover{text-decoration:underline}
-.prog-row-inline{display:flex; align-items:center; gap:8px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line-strong)}
+.prog-row-inline{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line-strong)}
 .prog-row-inline input[type="date"]{max-width:160px}
+.prog-modo-campos{display:flex; flex-direction:column; gap:2px}
+
+/* Toggle "ya se hizo" / "editar fecha directamente" -- se reutiliza en la
+   pestana Programacion y en la ficha del vehiculo (documentos). El admin
+   decide que carro va a preventiva y cual no, asi que la fecha no siempre se
+   calcula sola: destildando se escribe cualquier fecha, incluida una
+   anterior a hoy. */
+.prog-modo-toggle{
+  display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600;
+  color:var(--fg-muted); width:100%; margin-bottom:2px;
+}
+.prog-fecha-hint{font-size:11px; color:var(--fg-soft); font-style:italic}
 
 .alert-row-sub{color:var(--fg-soft); font-size:12px; font-weight:400}
 .alert-row-fecha{display:flex; align-items:center; gap:8px; white-space:nowrap}
