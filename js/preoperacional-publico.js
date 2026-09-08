@@ -284,13 +284,14 @@ function renderDocumentosVehiculo(placa, documentos, bimensual){
     <div class="preop-docs-list">
       ${documentos.map((d) => {
         const info = DOC_ESTADO_INFO[d.estado] || DOC_ESTADO_INFO.SIN_DOCUMENTO;
-        const necesitaFoto = d.estado !== "VIGENTE";
+        const necesitaFoto = d.estado !== "VIGENTE" || d.solicitada;
         const fecha = fmtFechaDoc(d.fecha_vencimiento);
         return `
-          <div class="preop-doc-row" data-tipo="${escapeHtml(d.tipo)}">
+          <div class="preop-doc-row${d.solicitada ? " preop-doc-row-solicitada" : ""}" data-tipo="${escapeHtml(d.tipo)}">
             <div class="preop-doc-row-info">
               <b>${info.icono} ${escapeHtml(d.label)}</b>
               <span class="muted">${info.texto}${fecha ? ` · ${fecha}` : ""}</span>
+              ${d.solicitada ? `<span class="preop-doc-solicitada-nota">📸 Tu coordinador te pidió esta foto</span>` : ""}
             </div>
             ${necesitaFoto ? `
               <label class="btn btn-sm btn-ghost preop-doc-btn-foto">

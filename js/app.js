@@ -713,9 +713,14 @@ function cerrarModal(){ docModal.classList.add("hidden"); docModalBody.innerHTML
 docModalClose.addEventListener("click", cerrarModal);
 docModal.addEventListener("click", (ev) => { if (ev.target === docModal) cerrarModal(); });
 
+function solicitudFotoActiva(placa, tipo){
+  return (currentData?.solicitudes_foto_activas || []).find((s) => s.placa === placa && s.tipo === tipo) || null;
+}
+
 function abrirModalVehiculo(placa){
   const v = (currentData.vehiculos || []).find((x) => x.placa === placa);
   if (!v) return;
+  const tiposConductor = new Set((currentData.tipos_flota_conductor || []).map((t) => t.tipo));
   docModalTitle.textContent = `${v.placa} · Interno ${v.interno || "—"}`;
   docModalBody.innerHTML = (currentData.tipos_flota || []).map((t) => {
     const d = docFor(currentData.documentos_flota, (x) => x.placa === placa && x.tipo === t.tipo);
@@ -724,6 +729,10 @@ function abrirModalVehiculo(placa){
     const metaHtml = esPreventivo
       ? (d?.fecha_vencimiento ? `Próxima bimensual programada: <b>${fmtFecha(d.fecha_vencimiento)}</b>` : "Todavía no hay bimensual registrada.")
       : docMetaHtml(d);
+    const solicitud = tiposConductor.has(t.tipo) ? solicitudFotoActiva(placa, t.tipo) : null;
+    const botonPedirFoto = !tiposConductor.has(t.tipo) ? "" : solicitud
+      ? `<button class="btn btn-sm btn-ghost" disabled title="Esperando a que el conductor la envíe">⏳ Foto solicitada</button>`
+      : `<button class="btn btn-sm btn-ghost btn-pedir-foto">📸 Pedir foto al conductor</button>`;
     const accionesHtml = esPreventivo
       ? `
         <div class="doc-row-hint">Indica el día en que se hizo la bimensual — la próxima se programa sola, 2 meses después.</div>
@@ -738,6 +747,7 @@ function abrirModalVehiculo(placa){
       : `
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
+          ${botonPedirFoto}
           <input type="date" class="fecha-venc" value="${d?.fecha_vencimiento || ""}" />
           <label class="doc-file-label">📎 <span class="file-txt">Elegir archivo</span>
             <input type="file" class="file-input" accept="application/pdf,image/*" />
@@ -756,6 +766,25 @@ function abrirModalVehiculo(placa){
   }).join("");
 
   bindDocRowEvents(docModalBody, { kind: "flota", placa: v.placa });
+
+  docModalBody.querySelectorAll(".btn-pedir-foto").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const tipo = btn.closest(".doc-row").getAttribute("data-tipo");
+      btn.disabled = true;
+      btn.textContent = "Enviando…";
+      try {
+        await callFn("solicitar_foto_documento", { placa: v.placa, tipo });
+        showToast("Se le pidió la foto al conductor. La verá en su checklist.", "ok");
+        await cargarListado();
+        abrirModalVehiculo(placa);
+      } catch (err) {
+        showToast(err.message || "No se pudo enviar la solicitud.", "err");
+        btn.disabled = false;
+        btn.textContent = "📸 Pedir foto al conductor";
+      }
+    });
+  });
+
   docModal.classList.remove("hidden");
 }
 
