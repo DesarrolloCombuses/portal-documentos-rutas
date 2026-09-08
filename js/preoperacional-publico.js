@@ -75,23 +75,32 @@ async function callFnUpload(action, formData){
   return body;
 }
 
-// Checklist consolidado: 9 verificaciones (antes 17) para que llenarlo tome
+// Checklist consolidado: verificaciones agrupadas para que llenarlo tome
 // menos de 3 minutos. Mismo catalogo que usa el portal de coordinadores
 // (js/app.js) -- se repite aqui porque esta pagina es publica y autocontenida.
+// v3: se agrega el autorreporte de aptitud del conductor y direccion/
+// suspension, exigidos por la gestion del conductor de la Res. 40595/2022
+// (PESV) y el Decreto 431/2017 (control de alcohol y sustancias).
 const PREOP_SECCIONES = [
+  { titulo: "🧍 Tu Condición para Conducir", items: [
+    { key: "conductor_apto", label: "¿Te encuentras en condiciones de conducir hoy? (descansado, sin síntomas, sin alcohol, sustancias psicoactivas ni medicamentos que afecten la conducción)", opciones: [
+      { value: "Sí, apto", label: "✅ Sí, estoy apto" }, { value: "No, no apto", label: "❌ No, no estoy apto" }] },
+  ]},
   { titulo: "🔧 Motor y Rodamiento", items: [
     { key: "fluidos", label: "Niveles de Fluidos (aceite, refrigerante, líquido de frenos)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Alguno bajo", label: "⚠️ Alguno bajo" }, { value: "Falta alguno o requiere cambio", label: "❌ Falta alguno o requiere cambio" }] },
     { key: "llantas", label: "Llantas (presión y desgaste)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Presión baja o desgaste visible", label: "⚠️ Presión baja o desgaste visible" }, { value: "Llanta lisa o desinflada", label: "❌ Llanta lisa o desinflada" }] },
+    { key: "direccion_suspension", label: "Dirección y Suspensión", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Vibra o hace ruido extraño", label: "⚠️ Vibra o hace ruido extraño" }, { value: "Juego excesivo o no responde bien", label: "❌ Juego excesivo o no responde bien" }] },
     { key: "frenos", label: "Frenos (servicio y estacionamiento)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Se sienten suaves o flojos", label: "⚠️ Se sienten suaves o flojos" }, { value: "No frenan bien", label: "❌ No frenan bien" }] },
   ]},
   { titulo: "💡 Visibilidad y Seguridad Interior", items: [
     { key: "luces", label: "Luces (delanteras, traseras, direccionales)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Alguna no sirve", label: "⚠️ Alguna no sirve" }, { value: "Varias no encienden", label: "❌ Varias no encienden" }] },
-    { key: "visibilidad", label: "Visibilidad (espejos y limpiaparabrisas)", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Requiere ajuste o no limpia bien", label: "⚠️ Requiere ajuste o no limpia bien" }, { value: "Dañado o no funciona", label: "❌ Dañado o no funciona" }] },
+    { key: "visibilidad", label: "Visibilidad (espejos, limpiaparabrisas y parabrisas sin fisuras)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Requiere ajuste o no limpia bien", label: "⚠️ Requiere ajuste o no limpia bien" }, { value: "Dañado, no funciona o parabrisas fisurado", label: "❌ Dañado, no funciona o parabrisas fisurado" }] },
     { key: "cinturones", label: "Cinturones de Seguridad", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Alguno dañado", label: "⚠️ Alguno dañado" }, { value: "No funcionan", label: "❌ No funcionan" }] },
   ]},
@@ -121,6 +130,9 @@ const DECISION = {
 };
 
 function renderPreopRadioGroup(item){
+  const alertaHtml = item.key === "conductor_apto"
+    ? `<div class="preop-apto-alerta hidden" id="pubAptoAlerta">🛑 No debes conducir hoy. Guarda igual este registro y avisa de inmediato a tu coordinador de ruta.</div>`
+    : "";
   return `
     <div class="preop-item" data-key="${escapeHtml(item.key)}">
       <span class="preop-item-label">${escapeHtml(item.label)}</span>
@@ -131,6 +143,7 @@ function renderPreopRadioGroup(item){
             ${escapeHtml(o.label)}
           </label>`).join("")}
       </div>
+      ${alertaHtml}
     </div>`;
 }
 
@@ -146,6 +159,15 @@ document.querySelectorAll(".preop-radio-option input").forEach((input) => {
     grupo.querySelectorAll(".preop-radio-option").forEach((o) => o.classList.remove("checked"));
     input.closest(".preop-radio-option").classList.add("checked");
     input.closest(".preop-item")?.classList.remove("has-error");
+  });
+});
+
+// Aviso inmediato (antes de llegar al final del formulario) si el conductor
+// dice que no está en condiciones de conducir.
+const pubAptoAlerta = document.getElementById("pubAptoAlerta");
+document.querySelectorAll('input[name="preop_conductor_apto"]').forEach((input) => {
+  input.addEventListener("change", () => {
+    pubAptoAlerta.classList.toggle("hidden", input.value !== "No, no apto");
   });
 });
 
@@ -308,14 +330,23 @@ function mostrarExito(preoperacional, alertas){
   publicExitoTitulo.style.color = decision.kind === "err" ? "var(--err)" : decision.kind === "warn" ? "var(--warn)" : "var(--ok)";
   publicExitoSub.textContent = `${preoperacional.placa} · ${preoperacional.conductor_nombre} · Km ${preoperacional.kilometraje ?? "—"}`;
 
-  if (!alertas.length) {
-    publicEvidenciasWrap.innerHTML = "";
+  // La aptitud del conductor no es una falla del vehículo: no tiene sentido
+  // pedirle una foto, se muestra aparte como aviso de seguridad.
+  const noApto = preoperacional.conductor_apto === "No, no apto";
+  const avisoApto = noApto
+    ? `<div class="preop-apto-alerta" style="margin-top:14px">🛑 Reportaste que no estás en condiciones de conducir. Por tu seguridad y la de los pasajeros, avisa de inmediato a tu coordinador de ruta y no operes el vehículo.</div>`
+    : "";
+  const alertasVehiculo = alertas.filter((a) => a.campo !== "conductor_apto");
+
+  if (!alertasVehiculo.length) {
+    publicEvidenciasWrap.innerHTML = avisoApto;
     return;
   }
 
   publicEvidenciasWrap.innerHTML = `
+    ${avisoApto}
     <div class="preop-section-title" style="margin-top:14px">📷 Agrega una foto de cada novedad (opcional)</div>
-    ${alertas.map((a) => `
+    ${alertasVehiculo.map((a) => `
       <div class="preop-evidencia-block" data-campo="${escapeHtml(a.campo)}">
         <div class="preop-evidencia-head">
           <b>${escapeHtml(PREOP_LABELS[a.campo] || a.campo)}: ${escapeHtml(a.valor)}</b>
@@ -363,6 +394,7 @@ btnOtroChecklist.addEventListener("click", () => {
   document.querySelectorAll('input[type="radio"]:checked').forEach((r) => { r.checked = false; });
   document.querySelectorAll(".preop-radio-option.checked").forEach((o) => o.classList.remove("checked"));
   document.querySelectorAll(".preop-item.has-error").forEach((el) => el.classList.remove("has-error"));
+  pubAptoAlerta.classList.add("hidden");
   pubFormMsg.textContent = "";
   window.scrollTo(0, 0);
 });

@@ -75,38 +75,50 @@ let toastTimer = null;
 // v2: 9 verificaciones consolidadas (antes 17) para que llenarlo tome menos
 // de 3 minutos, + kilometraje y cédula obligatorios. campo <-> columna real
 // en public.preoperacionales (hoy 1 a 1).
+// v3: se agrega el autorreporte de aptitud del conductor y direccion/
+// suspension, exigidos por la gestion del conductor de la Res. 40595/2022
+// (PESV) y el Decreto 431/2017 (control de alcohol y sustancias).
 const PREOP_COLUMNA = {
-  fluidos: "fluidos", llantas: "llantas", luces: "luces", frenos: "frenos",
+  conductor_apto: "conductor_apto", fluidos: "fluidos", llantas: "llantas",
+  direccion_suspension: "direccion_suspension", luces: "luces", frenos: "frenos",
   visibilidad: "visibilidad", cinturones: "cinturones", emergencia: "emergencia",
   puertas: "puertas", documentacion: "documentacion",
 };
 // Nivel de severidad por valor: 0=OK, 1=alerta (amarillo), 2=crítico (rojo). Solo para
 // pintar el semáforo en el portal — el servidor recalcula esto de forma independiente.
 const PREOP_NIVELES = {
+  conductor_apto: { "Sí, apto": 0, "No, no apto": 2 },
   fluidos: { OK: 0, "Alguno bajo": 1, "Falta alguno o requiere cambio": 2 },
   llantas: { OK: 0, "Presión baja o desgaste visible": 1, "Llanta lisa o desinflada": 2 },
+  direccion_suspension: { OK: 0, "Vibra o hace ruido extraño": 1, "Juego excesivo o no responde bien": 2 },
   luces: { OK: 0, "Alguna no sirve": 1, "Varias no encienden": 2 },
   frenos: { OK: 0, "Se sienten suaves o flojos": 1, "No frenan bien": 2 },
-  visibilidad: { OK: 0, "Requiere ajuste o no limpia bien": 1, "Dañado o no funciona": 2 },
+  visibilidad: { OK: 0, "Requiere ajuste o no limpia bien": 1, "Dañado, no funciona o parabrisas fisurado": 2 },
   cinturones: { OK: 0, "Alguno dañado": 1, "No funcionan": 2 },
   emergencia: { OK: 0, "Algo incompleto o vencido": 1, "Falta extintor o botiquín": 2 },
   puertas: { OK: 0, "Pasamanos flojo o puerta dura": 1, "No cierra bien o no hay salida de emergencia": 2 },
   documentacion: { OK: 0, "Alguno por vencer": 1, "Alguno vencido o falta": 2 },
 };
 const PREOP_SECCIONES = [
+  { titulo: "🧍 Condición del Conductor", items: [
+    { key: "conductor_apto", label: "¿El conductor está en condiciones de conducir hoy? (descansado, sin síntomas, sin alcohol, sustancias psicoactivas ni medicamentos que afecten la conducción)", opciones: [
+      { value: "Sí, apto", label: "✅ Sí, apto" }, { value: "No, no apto", label: "❌ No, no apto" }] },
+  ]},
   { titulo: "🔧 Motor y Rodamiento", items: [
     { key: "fluidos", label: "Niveles de Fluidos (aceite, refrigerante, líquido de frenos)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Alguno bajo", label: "⚠️ Alguno bajo" }, { value: "Falta alguno o requiere cambio", label: "❌ Falta alguno o requiere cambio" }] },
     { key: "llantas", label: "Llantas (presión y desgaste)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Presión baja o desgaste visible", label: "⚠️ Presión baja o desgaste visible" }, { value: "Llanta lisa o desinflada", label: "❌ Llanta lisa o desinflada" }] },
+    { key: "direccion_suspension", label: "Dirección y Suspensión", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Vibra o hace ruido extraño", label: "⚠️ Vibra o hace ruido extraño" }, { value: "Juego excesivo o no responde bien", label: "❌ Juego excesivo o no responde bien" }] },
     { key: "frenos", label: "Frenos (servicio y estacionamiento)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Se sienten suaves o flojos", label: "⚠️ Se sienten suaves o flojos" }, { value: "No frenan bien", label: "❌ No frenan bien" }] },
   ]},
   { titulo: "💡 Visibilidad y Seguridad Interior", items: [
     { key: "luces", label: "Luces (delanteras, traseras, direccionales)", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Alguna no sirve", label: "⚠️ Alguna no sirve" }, { value: "Varias no encienden", label: "❌ Varias no encienden" }] },
-    { key: "visibilidad", label: "Visibilidad (espejos y limpiaparabrisas)", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Requiere ajuste o no limpia bien", label: "⚠️ Requiere ajuste o no limpia bien" }, { value: "Dañado o no funciona", label: "❌ Dañado o no funciona" }] },
+    { key: "visibilidad", label: "Visibilidad (espejos, limpiaparabrisas y parabrisas sin fisuras)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Requiere ajuste o no limpia bien", label: "⚠️ Requiere ajuste o no limpia bien" }, { value: "Dañado, no funciona o parabrisas fisurado", label: "❌ Dañado, no funciona o parabrisas fisurado" }] },
     { key: "cinturones", label: "Cinturones de Seguridad", opciones: [
       { value: "OK", label: "✅ OK" }, { value: "Alguno dañado", label: "⚠️ Alguno dañado" }, { value: "No funcionan", label: "❌ No funcionan" }] },
   ]},
@@ -931,6 +943,9 @@ function renderPreopList(){
 }
 
 function renderPreopRadioGroup(item){
+  const alertaHtml = item.key === "conductor_apto"
+    ? `<div class="preop-apto-alerta hidden" data-apto-alerta>🛑 El conductor no debe salir a operar hoy. Regístralo igual y gestiona el reemplazo.</div>`
+    : "";
   return `
     <div class="preop-item" data-key="${escapeHtml(item.key)}">
       <span class="preop-item-label">${escapeHtml(item.label)}</span>
@@ -941,6 +956,7 @@ function renderPreopRadioGroup(item){
             ${escapeHtml(o.label)}
           </label>`).join("")}
       </div>
+      ${alertaHtml}
     </div>`;
 }
 
@@ -999,6 +1015,13 @@ function abrirPreopForm(){
       grupo.querySelectorAll(".preop-radio-option").forEach((o) => o.classList.remove("checked"));
       input.closest(".preop-radio-option").classList.add("checked");
       input.closest(".preop-item")?.classList.remove("has-error");
+    });
+  });
+
+  const aptoAlerta = preopModalBody.querySelector("[data-apto-alerta]");
+  preopModalBody.querySelectorAll('input[name="preop_conductor_apto"]').forEach((input) => {
+    input.addEventListener("change", () => {
+      aptoAlerta?.classList.toggle("hidden", input.value !== "No, no apto");
     });
   });
 
@@ -1079,7 +1102,8 @@ function evidenciasDePreop(preopId){
 function abrirPreopDetalle(id){
   const p = buscarPreopPorId(id);
   if (!p) return;
-  preopModalTitle.textContent = `${p.placa} · ${fmtFecha(p.fecha)}`;
+  const hora = p.created_at ? new Date(p.created_at).toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }) : "";
+  preopModalTitle.textContent = `${p.placa} · ${fmtFecha(p.fecha)}${hora ? ` · ${hora}` : ""}`;
 
   const todosLosItems = PREOP_SECCIONES.flatMap((s) => s.items);
   const detalleHtml = todosLosItems.map((it) => {
@@ -1092,12 +1116,16 @@ function abrirPreopDetalle(id){
   }).join("");
 
   const fallas = fallasDe(p);
+  // La aptitud del conductor no es una falla del vehículo: no tiene sentido
+  // pedir una foto, se muestra aparte como aviso de seguridad.
+  const fallasVehiculo = fallas.filter(({ item }) => item.key !== "conductor_apto");
+  const noApto = p.conductor_apto === "No, no apto";
   const evidenciasPorCampo = {};
   evidenciasDePreop(p.id).forEach((e) => {
     (evidenciasPorCampo[e.campo] = evidenciasPorCampo[e.campo] || []).push(e);
   });
 
-  const evidenciasHtml = fallas.map(({ item }) => {
+  const evidenciasHtml = fallasVehiculo.map(({ item }) => {
     const fotos = evidenciasPorCampo[item.key] || [];
     return `
       <div class="preop-evidencia-block" data-campo="${escapeHtml(item.key)}">
@@ -1118,12 +1146,13 @@ function abrirPreopDetalle(id){
 
   preopModalBody.innerHTML = `
     <div class="preop-badge ${claseEstado(p.estado_general)}" style="display:inline-flex;gap:6px;margin-bottom:10px">${decision.icono} ${escapeHtml(decision.titulo)}</div>
+    ${noApto ? `<div class="preop-apto-alerta" style="margin-bottom:10px">🛑 El conductor reportó que NO estaba en condiciones de conducir ese día.</div>` : ""}
     <div style="margin-bottom:10px;font-size:13px;color:var(--fg-soft)">
       Conductor: <b>${escapeHtml(p.conductor_nombre || "—")}</b> · CC ${escapeHtml(p.conductor_cedula || "—")} · Interno ${escapeHtml(p.interno || "—")} · Km ${escapeHtml(p.kilometraje ?? "—")}
       ${p.observaciones ? `<div style="margin-top:6px">📝 ${escapeHtml(p.observaciones)}</div>` : ""}
     </div>
     <div class="preop-detalle-grid">${detalleHtml}</div>
-    ${fallas.length ? `<div class="preop-section-title">📷 Evidencia de fallas</div>${evidenciasHtml}` : ""}
+    ${fallasVehiculo.length ? `<div class="preop-section-title">📷 Evidencia de fallas</div>${evidenciasHtml}` : ""}
   `;
 
   preopModalBody.querySelectorAll(".preop-evid-input").forEach((input) => {
