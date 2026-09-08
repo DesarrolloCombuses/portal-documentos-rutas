@@ -62,6 +62,16 @@ function escapeHtml(s){
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 }
 
+// La bimensual (Mantenimiento Preventivo) se registra con la fecha en que se
+// hizo; la proxima queda programada automaticamente 2 meses despues.
+function addMonthsISO(isoDate, months){
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(isoDate || ""));
+  if (!m) return isoDate;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  d.setUTCMonth(d.getUTCMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+
 function fmtFecha(iso){
   if (!iso) return "—";
   const [y,m,d] = String(iso).split("-");
@@ -369,15 +379,22 @@ function abrirModalVehiculo(placa){
   docModalBody.innerHTML = (currentData.tipos_flota || []).map((t) => {
     const d = docFor(currentData.documentos_flota, (x) => x.placa === placa && x.tipo === t.tipo);
     const est = d ? d.estado_vencimiento : null;
-    return `
-      <div class="doc-row" data-tipo="${escapeHtml(t.tipo)}">
-        <div class="doc-row-head">
-          <span class="doc-row-title">${escapeHtml(t.label)}</span>
-          <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
-        </div>
-        <div class="doc-row-meta">
-          ${docMetaHtml(d)}
-        </div>
+    const esPreventivo = t.tipo === "MANTENIMIENTO_PREVENTIVO";
+    const metaHtml = esPreventivo
+      ? (d?.fecha_vencimiento ? `Próxima bimensual programada: <b>${fmtFecha(d.fecha_vencimiento)}</b>` : "Todavía no hay bimensual registrada.")
+      : docMetaHtml(d);
+    const accionesHtml = esPreventivo
+      ? `
+        <div class="doc-row-hint">Indica el día en que se hizo la bimensual — la próxima se programa sola, 2 meses después.</div>
+        <div class="doc-row-actions">
+          ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
+          <input type="date" class="fecha-venc" data-preventivo="1" title="Fecha en que se realizó" />
+          <label class="doc-file-label">📎 <span class="file-txt">Foto (opcional)</span>
+            <input type="file" class="file-input" accept="application/pdf,image/*" />
+          </label>
+          <button class="btn btn-primary btn-sm btn-subir">✅ Registrar bimensual</button>
+        </div>`
+      : `
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
           <input type="date" class="fecha-venc" value="${d?.fecha_vencimiento || ""}" />
@@ -385,7 +402,15 @@ function abrirModalVehiculo(placa){
             <input type="file" class="file-input" accept="application/pdf,image/*" />
           </label>
           <button class="btn btn-primary btn-sm btn-subir">Subir</button>
+        </div>`;
+    return `
+      <div class="doc-row" data-tipo="${escapeHtml(t.tipo)}">
+        <div class="doc-row-head">
+          <span class="doc-row-title">${escapeHtml(t.label)}</span>
+          <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
         </div>
+        <div class="doc-row-meta">${metaHtml}</div>
+        ${accionesHtml}
       </div>`;
   }).join("");
 
@@ -444,19 +469,28 @@ function bindDocRowEvents(container, ctx){
     });
   });
   container.querySelectorAll(".btn-subir").forEach((btn) => {
+    const row0 = btn.closest(".doc-row");
+    const textoOriginal = btn.textContent;
     btn.addEventListener("click", async () => {
-      const row = btn.closest(".doc-row");
+      const row = row0;
       const tipo = row.getAttribute("data-tipo");
+      const esPreventivo = tipo === "MANTENIMIENTO_PREVENTIVO";
       const file = row.querySelector(".file-input").files?.[0];
-      const fecha = row.querySelector(".fecha-venc").value || "";
-      if (!file) { showToast("Selecciona un archivo antes de subir.", "err"); return; }
+      let fecha = row.querySelector(".fecha-venc").value || "";
+      if (esPreventivo) {
+        if (!fecha) { showToast("Indica la fecha en que se hizo la bimensual.", "err"); return; }
+        fecha = addMonthsISO(fecha, 2);
+      } else if (!file) {
+        showToast("Selecciona un archivo antes de subir.", "err");
+        return;
+      }
       btn.disabled = true;
-      btn.textContent = "Subiendo…";
+      btn.textContent = esPreventivo ? "Registrando…" : "Subiendo…";
       try {
         const fd = new FormData();
         fd.set("tipo", tipo);
         fd.set("fecha_vencimiento", fecha);
-        fd.set("file", file);
+        if (file) fd.set("file", file);
         if (ctx.kind === "flota") {
           fd.set("placa", ctx.placa);
           await callFnUpload("subir_flota", fd);
@@ -466,13 +500,13 @@ function bindDocRowEvents(container, ctx){
           fd.set("categoria_licencia", categoria);
           await callFnUpload("subir_conductor", fd);
         }
-        showToast("Documento subido correctamente.", "ok");
+        showToast(esPreventivo ? "Bimensual registrada. Próxima programada automáticamente." : "Documento subido correctamente.", "ok");
         await cargarListado();
         if (ctx.kind === "flota") abrirModalVehiculo(ctx.placa); else abrirModalConductor(ctx.cedula);
       } catch (err) {
-        showToast(err.message || "No se pudo subir el documento.", "err");
+        showToast(err.message || "No se pudo guardar.", "err");
         btn.disabled = false;
-        btn.textContent = "Subir";
+        btn.textContent = textoOriginal;
       }
     });
   });
