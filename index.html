@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.11.1" />
+<link rel="stylesheet" href="css/styles.css?v=1.11.2" />
 </head>
 <body>
 
@@ -149,7 +149,13 @@
       <button class="modal-close" id="nuevoConductorClose">✕</button>
     </div>
     <div class="modal-body">
-      <div class="preop-form-field" style="margin-bottom:12px">
+      <div class="preop-form-field" style="margin-bottom:6px">
+        <label>🔎 Buscar en Sonar (cédula o nombre)</label>
+        <input type="text" id="nuevoConductorBuscarSonar" placeholder="Escribe para autocompletar…" autocomplete="off" />
+        <span class="preop-field-hint">Sonar trae el nombre y la cédula correctos; tú decides si es de tu ruta.</span>
+      </div>
+      <div id="nuevoConductorSonarResultados" class="sonar-resultados hidden"></div>
+      <div class="preop-form-field" style="margin-bottom:12px;margin-top:12px">
         <label>Cédula *</label>
         <input type="text" inputmode="numeric" id="nuevoConductorCedula" placeholder="Número de cédula" />
       </div>
@@ -195,8 +201,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="js/conectividad.js?v=1.11.1"></script>
-<script src="js/app.js?v=1.11.1"></script>
-<script src="js/pwa.js?v=1.11.1"></script>
+<script src="js/conectividad.js?v=1.11.2"></script>
+<script src="js/app.js?v=1.11.2"></script>
+<script src="js/pwa.js?v=1.11.2"></script>
 </body>
 </html>

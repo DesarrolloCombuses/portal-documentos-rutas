@@ -34,6 +34,8 @@ const buscarConductor = document.getElementById("buscarConductor");
 const btnNuevoConductor = document.getElementById("btnNuevoConductor");
 const nuevoConductorModal = document.getElementById("nuevoConductorModal");
 const nuevoConductorClose = document.getElementById("nuevoConductorClose");
+const nuevoConductorBuscarSonar = document.getElementById("nuevoConductorBuscarSonar");
+const nuevoConductorSonarResultados = document.getElementById("nuevoConductorSonarResultados");
 const nuevoConductorCedula = document.getElementById("nuevoConductorCedula");
 const nuevoConductorNombre = document.getElementById("nuevoConductorNombre");
 const nuevoConductorInterno = document.getElementById("nuevoConductorInterno");
@@ -1046,18 +1048,58 @@ buscarConductor.addEventListener("input", renderConductores);
 // tiene esa relacion por ruta), asi que el coordinador -- que si sabe quienes
 // son sus conductores -- los agrega el mismo aqui.
 function abrirNuevoConductorModal(){
+  nuevoConductorBuscarSonar.value = "";
+  nuevoConductorSonarResultados.innerHTML = "";
+  nuevoConductorSonarResultados.classList.add("hidden");
   nuevoConductorCedula.value = "";
   nuevoConductorNombre.value = "";
   nuevoConductorInterno.value = "";
   nuevoConductorVehiculo.value = "";
   nuevoConductorMsg.textContent = "";
   nuevoConductorModal.classList.remove("hidden");
-  nuevoConductorCedula.focus();
+  nuevoConductorBuscarSonar.focus();
 }
 function cerrarNuevoConductorModal(){ nuevoConductorModal.classList.add("hidden"); }
 btnNuevoConductor.addEventListener("click", abrirNuevoConductorModal);
 nuevoConductorClose.addEventListener("click", cerrarNuevoConductorModal);
 nuevoConductorModal.addEventListener("click", (ev) => { if (ev.target === nuevoConductorModal) cerrarNuevoConductorModal(); });
+
+// Autocompletar desde Sonar: Sonar tiene nombre+cedula correctos pero no
+// sabe si es de Zamora o Aranjuez, asi que solo llena el formulario -- el
+// coordinador sigue siendo quien decide agregarlo a su lista.
+let sonarBuscarTimer = null;
+nuevoConductorBuscarSonar.addEventListener("input", () => {
+  const q = nuevoConductorBuscarSonar.value.trim();
+  clearTimeout(sonarBuscarTimer);
+  if (q.length < 3) {
+    nuevoConductorSonarResultados.classList.add("hidden");
+    return;
+  }
+  sonarBuscarTimer = setTimeout(async () => {
+    try {
+      const { resultados } = await callFn("buscar_conductor_sonar", { query: q });
+      if (!resultados.length) {
+        nuevoConductorSonarResultados.innerHTML = `<div class="sonar-resultado-vacio muted">Sin coincidencias en Sonar. Puedes escribirlo manualmente abajo.</div>`;
+      } else {
+        nuevoConductorSonarResultados.innerHTML = resultados.map((r) => `
+          <button type="button" class="sonar-resultado-item" data-cedula="${escapeHtml(r.cedula)}" data-nombre="${escapeHtml(r.nombre)}">
+            <b>${escapeHtml(r.nombre)}</b><span class="muted"> · CC ${escapeHtml(r.cedula)}</span>
+          </button>`).join("");
+        nuevoConductorSonarResultados.querySelectorAll(".sonar-resultado-item").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            nuevoConductorCedula.value = btn.getAttribute("data-cedula");
+            nuevoConductorNombre.value = btn.getAttribute("data-nombre");
+            nuevoConductorSonarResultados.classList.add("hidden");
+            nuevoConductorBuscarSonar.value = btn.getAttribute("data-nombre");
+          });
+        });
+      }
+      nuevoConductorSonarResultados.classList.remove("hidden");
+    } catch (err) {
+      nuevoConductorSonarResultados.classList.add("hidden");
+    }
+  }, 350);
+});
 
 btnGuardarNuevoConductor.addEventListener("click", async () => {
   const cedula = nuevoConductorCedula.value.trim();
