@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.5.0" />
+<link rel="stylesheet" href="css/styles.css?v=1.6.0" />
 </head>
 <body>
 
@@ -52,15 +52,11 @@
     <nav class="section-tabs">
       <button class="section-tab active" data-section="vehiculos">Vehículos</button>
       <button class="section-tab" data-section="conductores">Conductores</button>
+      <button class="section-tab" data-section="programacion">🔧 Programación</button>
       <button class="section-tab" data-section="escaneo">📷 Escaneo de tarjetas</button>
     </nav>
 
     <section id="secVehiculos" class="section">
-      <div id="alertaPreventivo" class="alert-panel hidden">
-        <div class="alert-panel-head">🔧 Próximas bimensuales (Mantenimiento Preventivo)</div>
-        <div id="alertaPreventivoBody" class="alert-list"></div>
-      </div>
-
       <div class="section-toolbar">
         <input type="search" id="buscarVehiculo" placeholder="Buscar por placa o interno…" />
       </div>
@@ -72,6 +68,20 @@
         <input type="search" id="buscarConductor" placeholder="Buscar por nombre o cédula…" />
       </div>
       <div id="conductoresGrid" class="cards-grid"></div>
+    </section>
+
+    <section id="secProgramacion" class="section hidden">
+      <div class="prog-toolbar">
+        <div class="prog-filtros" id="progFiltros">
+          <button class="prog-filtro active" data-filtro="todas">Todas</button>
+          <button class="prog-filtro" data-filtro="vencidas">Vencidas</button>
+          <button class="prog-filtro" data-filtro="7">Próx. 7 días</button>
+          <button class="prog-filtro" data-filtro="30">Próx. 30 días</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnExportarProgPdf">📄 Exportar PDF</button>
+      </div>
+      <div class="muted" style="margin-bottom:12px">Programación de Mantenimiento Preventivo (bimensual) de tus vehículos, del más urgente al más lejano.</div>
+      <div id="progList" class="prog-list"></div>
     </section>
 
     <section id="secEscaneo" class="section hidden">
@@ -107,7 +117,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="js/app.js?v=1.5.0"></script>
-<script src="js/pwa.js?v=1.5.0"></script>
+<script src="js/app.js?v=1.6.0"></script>
+<script src="js/pwa.js?v=1.6.0"></script>
 </body>
 </html>

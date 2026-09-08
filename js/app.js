@@ -25,15 +25,17 @@ const btnLogout = document.getElementById("btnLogout");
 const btnRefresh = document.getElementById("btnRefresh");
 const rutaLabel = document.getElementById("rutaLabel");
 const summaryBar = document.getElementById("summaryBar");
-const alertaPreventivo = document.getElementById("alertaPreventivo");
-const alertaPreventivoBody = document.getElementById("alertaPreventivoBody");
 const vehiculosGrid = document.getElementById("vehiculosGrid");
 const conductoresGrid = document.getElementById("conductoresGrid");
 const buscarVehiculo = document.getElementById("buscarVehiculo");
 const buscarConductor = document.getElementById("buscarConductor");
 const secVehiculos = document.getElementById("secVehiculos");
 const secConductores = document.getElementById("secConductores");
+const secProgramacion = document.getElementById("secProgramacion");
 const secEscaneo = document.getElementById("secEscaneo");
+const progFiltros = document.getElementById("progFiltros");
+const progList = document.getElementById("progList");
+const btnExportarProgPdf = document.getElementById("btnExportarProgPdf");
 const docModal = document.getElementById("docModal");
 const docModalTitle = document.getElementById("docModalTitle");
 const docModalBody = document.getElementById("docModalBody");
@@ -48,6 +50,7 @@ const escaneosGrid = document.getElementById("escaneosGrid");
 
 let currentData = null;
 let escaneosActuales = [];
+let progFiltroActivo = "todas";
 let toastTimer = null;
 
 function showToast(msg, kind){
@@ -172,7 +175,7 @@ async function cargarListado(){
     const rutas = (data.rutas || []).join(" · ") || "—";
     rutaLabel.innerHTML = `Ruta ${escapeHtml(rutas)} <span class="topbar-user">· conectado como <b>${escapeHtml(data.nombre_coordinador || email)}</b>${data.nombre_coordinador ? ` (${escapeHtml(email)})` : ""}</span>`;
     renderResumen();
-    renderAlertaPreventivo();
+    renderProgramacion();
     renderVehiculos();
     renderConductores();
   } catch (err) {
@@ -261,8 +264,8 @@ function textoDias(dias){
   return `En ${dias} días`;
 }
 
-function renderAlertaPreventivo(){
-  const filas = (currentData?.vehiculos || [])
+function filasProgramacion(){
+  return (currentData?.vehiculos || [])
     .map((v) => {
       const d = docFor(currentData?.documentos_flota, (x) => x.placa === v.placa && x.tipo === "MANTENIMIENTO_PREVENTIVO");
       if (!d?.fecha_vencimiento) return null;
@@ -270,28 +273,138 @@ function renderAlertaPreventivo(){
     })
     .filter(Boolean)
     .sort((a, b) => a.dias - b.dias);
+}
 
-  if (!filas.length) {
-    alertaPreventivo.classList.add("hidden");
+function aplicarFiltroProgramacion(filas){
+  if (progFiltroActivo === "vencidas") return filas.filter((f) => f.dias < 0);
+  if (progFiltroActivo === "7") return filas.filter((f) => f.dias <= 7);
+  if (progFiltroActivo === "30") return filas.filter((f) => f.dias <= 30);
+  return filas;
+}
+
+function renderProgramacion(){
+  const todas = filasProgramacion();
+  const filas = aplicarFiltroProgramacion(todas);
+
+  if (!todas.length) {
+    progList.innerHTML = `<div class="empty-state">Todavía no hay bimensuales programadas.</div>`;
     return;
   }
-  alertaPreventivo.classList.remove("hidden");
-  alertaPreventivoBody.innerHTML = filas.map(({ v, fecha, dias }) => {
+  if (!filas.length) {
+    progList.innerHTML = `<div class="empty-state">No hay vehículos en este filtro.</div>`;
+    return;
+  }
+
+  progList.innerHTML = filas.map(({ v, fecha, dias }) => {
     const cls = dias < 0 ? "is-vencido" : dias <= 7 ? "is-pronto" : "";
+    const colorDias = dias < 0 ? "var(--err)" : dias <= 7 ? "var(--warn)" : "var(--fg-soft)";
     return `
-      <div class="alert-row ${cls}" data-placa="${escapeHtml(v.placa)}">
-        <span class="alert-row-veh">${escapeHtml(v.placa)} <span class="alert-row-sub">Interno ${escapeHtml(v.interno || "—")}</span></span>
-        <span class="alert-row-fecha">
-          <span>${fmtFecha(fecha)}</span>
-          <span class="alert-row-dias" style="color:${dias < 0 ? "var(--err)" : dias <= 7 ? "var(--warn)" : "var(--fg-soft)"}">${textoDias(dias)}</span>
-        </span>
+      <div class="prog-row ${cls}" data-placa="${escapeHtml(v.placa)}">
+        <div class="prog-row-main">
+          <span class="prog-row-veh">${escapeHtml(v.placa)} <span class="alert-row-sub">Interno ${escapeHtml(v.interno || "—")}</span></span>
+          <span class="alert-row-fecha">
+            <span>${fmtFecha(fecha)}</span>
+            <span class="alert-row-dias" style="color:${colorDias}">${textoDias(dias)}</span>
+          </span>
+          <button class="btn btn-sm btn-ghost prog-btn-registrar">✅ Registrar</button>
+        </div>
+        <div class="prog-row-inline hidden">
+          <input type="date" class="prog-fecha-hecha" value="${hoyISO()}" title="Fecha en que se hizo" />
+          <button class="btn btn-primary btn-sm prog-btn-confirmar">Guardar</button>
+          <button class="btn btn-ghost btn-sm prog-btn-cancelar">Cancelar</button>
+        </div>
       </div>`;
   }).join("");
 
-  alertaPreventivoBody.querySelectorAll(".alert-row").forEach((row) => {
-    row.addEventListener("click", () => abrirModalVehiculo(row.getAttribute("data-placa")));
+  progList.querySelectorAll(".prog-row-veh").forEach((el) => {
+    el.addEventListener("click", () => abrirModalVehiculo(el.closest(".prog-row").getAttribute("data-placa")));
+  });
+  progList.querySelectorAll(".prog-btn-registrar").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      btn.closest(".prog-row").querySelector(".prog-row-inline").classList.toggle("hidden");
+    });
+  });
+  progList.querySelectorAll(".prog-btn-cancelar").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      btn.closest(".prog-row-inline").classList.add("hidden");
+    });
+  });
+  progList.querySelectorAll(".prog-btn-confirmar").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const row = btn.closest(".prog-row");
+      const placa = row.getAttribute("data-placa");
+      const fechaHecha = row.querySelector(".prog-fecha-hecha").value;
+      if (!fechaHecha) { showToast("Indica la fecha en que se hizo.", "err"); return; }
+      const proxima = addMonthsISO(fechaHecha, 2);
+      btn.disabled = true;
+      btn.textContent = "Guardando…";
+      try {
+        const fd = new FormData();
+        fd.set("placa", placa);
+        fd.set("tipo", "MANTENIMIENTO_PREVENTIVO");
+        fd.set("fecha_vencimiento", proxima);
+        await callFnUpload("subir_flota", fd);
+        showToast("Bimensual registrada. Próxima programada automáticamente.", "ok");
+        await cargarListado();
+        renderProgramacion();
+      } catch (err) {
+        showToast(err.message || "No se pudo registrar.", "err");
+        btn.disabled = false;
+        btn.textContent = "Guardar";
+      }
+    });
   });
 }
+
+progFiltros.querySelectorAll(".prog-filtro").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    progFiltros.querySelectorAll(".prog-filtro").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    progFiltroActivo = btn.getAttribute("data-filtro");
+    renderProgramacion();
+  });
+});
+
+btnExportarProgPdf.addEventListener("click", () => {
+  const filas = aplicarFiltroProgramacion(filasProgramacion());
+  if (!filas.length) { showToast("No hay filas para exportar con este filtro.", "warn"); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const margin = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let y = margin;
+
+  doc.setFontSize(14);
+  doc.text(`Programación de Mantenimiento Preventivo · ${(currentData?.rutas || []).join(", ")}`, margin, y);
+  y += 18;
+  doc.setFontSize(9);
+  doc.text(`Generado: ${new Date().toLocaleString("es-CO")}`, margin, y);
+  y += 24;
+
+  doc.setFontSize(10);
+  doc.setFont(undefined, "bold");
+  doc.text("Placa", margin, y);
+  doc.text("Interno", margin + 90, y);
+  doc.text("Fecha", margin + 170, y);
+  doc.text("Estado", margin + 260, y);
+  doc.setFont(undefined, "normal");
+  y += 6;
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 14;
+
+  filas.forEach(({ v, fecha, dias }) => {
+    if (y > pageHeight - margin) { doc.addPage(); y = margin; }
+    doc.text(String(v.placa || "—"), margin, y);
+    doc.text(String(v.interno || "—"), margin + 90, y);
+    doc.text(fmtFecha(fecha), margin + 170, y);
+    doc.text(textoDias(dias), margin + 260, y);
+    y += 16;
+  });
+
+  const ruta = ((currentData?.rutas || [])[0] || "ruta").replace(/[^\w-]+/g, "_");
+  doc.save(`programacion_preventivo_${ruta}_${hoyISO()}.pdf`);
+});
 
 function renderVehiculos(){
   const term = (buscarVehiculo.value || "").trim().toLowerCase();
@@ -520,7 +633,9 @@ document.querySelectorAll(".section-tab").forEach((tab) => {
     const target = tab.getAttribute("data-section");
     secVehiculos.classList.toggle("hidden", target !== "vehiculos");
     secConductores.classList.toggle("hidden", target !== "conductores");
+    secProgramacion.classList.toggle("hidden", target !== "programacion");
     secEscaneo.classList.toggle("hidden", target !== "escaneo");
+    if (target === "programacion") renderProgramacion();
     if (target === "escaneo") cargarEscaneos();
   });
 });
