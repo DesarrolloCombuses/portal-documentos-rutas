@@ -4,7 +4,7 @@
 //   - Supabase (API, storage, funciones) y CDNs externos: pasan directo a la red, NUNCA se cachean.
 //   - Auto-update: skipWaiting + clients.claim para que la nueva version reemplace a la anterior al instante.
 
-const VERSION = "v1.9.7";
+const VERSION = "v1.9.8";
 const CACHE_NAME = `portal-docs-rutas-${VERSION}`;
 const NETWORK_TIMEOUT_MS = 4000;
 
@@ -21,6 +21,7 @@ const PRECACHE_URLS = [
   "./manifest-preoperacional.webmanifest",
   "./js/preoperacional-publico.js",
   "./js/pwa.js",
+  "./js/conectividad.js",
 ];
 
 // Dominios cuyas respuestas NUNCA se cachean (datos vivos / auth).

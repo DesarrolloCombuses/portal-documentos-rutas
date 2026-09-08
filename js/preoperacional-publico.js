@@ -58,20 +58,44 @@ function escapeHtml(s){
   return String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
 }
 
+// Un solo lugar para revisar la conexion antes de hablar con el servidor: si
+// ya sabemos (por js/conectividad.js) que no hay internet, fallamos rapido
+// con un mensaje claro en vez de dejar que el fetch cuelgue o tire un error
+// crudo tipo "Failed to fetch" -- importante aqui porque el conductor puede
+// llevar 3 minutos llenando el checklist y no darse cuenta de que perdio señal.
+function sinConexionError(){
+  return new Error("Sin conexión a internet. Verifica tu señal e intenta de nuevo.");
+}
+function hayConexionAhora(){
+  return !window.hayConexion || window.hayConexion();
+}
+
 async function callFn(action, extra){
-  const res = await fetch(FUNCTION_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action, ...extra }),
-  });
+  if (!hayConexionAhora()) throw sinConexionError();
+  let res;
+  try {
+    res = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+  } catch (_) {
+    throw sinConexionError();
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
   return body;
 }
 
 async function callFnUpload(action, formData){
+  if (!hayConexionAhora()) throw sinConexionError();
   formData.set("action", action);
-  const res = await fetch(FUNCTION_URL, { method: "POST", body: formData });
+  let res;
+  try {
+    res = await fetch(FUNCTION_URL, { method: "POST", body: formData });
+  } catch (_) {
+    throw sinConexionError();
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
   return body;

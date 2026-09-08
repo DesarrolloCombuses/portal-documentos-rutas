@@ -184,28 +184,51 @@ async function getToken(){
   return data?.session?.access_token || null;
 }
 
+// Un solo lugar para revisar la conexion antes de hablar con el servidor:
+// si ya sabemos (por js/conectividad.js) que no hay internet, fallamos rapido
+// con un mensaje claro en vez de dejar que el fetch cuelgue o tire un error
+// crudo tipo "Failed to fetch".
+function sinConexionError(){
+  return new Error("Sin conexión a internet. Verifica tu señal e intenta de nuevo.");
+}
+function hayConexionAhora(){
+  return !window.hayConexion || window.hayConexion();
+}
+
 async function callFn(action, extra){
+  if (!hayConexionAhora()) throw sinConexionError();
   const token = await getToken();
   if (!token) throw new Error("Tu sesión expiró, vuelve a iniciar sesión.");
-  const res = await fetch(FUNCTION_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ action, ...extra }),
-  });
+  let res;
+  try {
+    res = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ...extra }),
+    });
+  } catch (_) {
+    throw sinConexionError();
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
   return body;
 }
 
 async function callFnUpload(action, formData){
+  if (!hayConexionAhora()) throw sinConexionError();
   const token = await getToken();
   if (!token) throw new Error("Tu sesión expiró, vuelve a iniciar sesión.");
   formData.set("action", action);
-  const res = await fetch(FUNCTION_URL, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
+  let res;
+  try {
+    res = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: formData,
+    });
+  } catch (_) {
+    throw sinConexionError();
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.error || `Error ${res.status}`);
   return body;
