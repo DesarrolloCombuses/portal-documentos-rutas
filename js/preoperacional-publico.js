@@ -170,6 +170,16 @@ pubConductor.addEventListener("change", () => {
   if (match?.cedula) pubCedula.value = match.cedula;
 });
 
+// Al revés: si escriben primero la cédula, busca al conductor por cédula y
+// autocompleta el nombre (antes solo funcionaba nombre -> cédula).
+pubCedula.addEventListener("change", () => {
+  if (pubConductor.value.trim()) return;
+  const cedula = pubCedula.value.trim();
+  if (!cedula) return;
+  const match = conductores.find((c) => (c.cedula || "").trim() === cedula);
+  if (match?.nombre) pubConductor.value = match.nombre;
+});
+
 // ---------------- Guardar ----------------
 btnGuardarPublico.addEventListener("click", async () => {
   pubFormMsg.textContent = "";
