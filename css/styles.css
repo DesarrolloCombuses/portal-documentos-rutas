@@ -127,6 +127,8 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
 
 .section-toolbar{margin-bottom:12px}
 .section-toolbar input{max-width:320px}
+.section-toolbar-row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+.section-toolbar-row input{flex:1}
 
 /* ---- Programacion de Mantenimiento Preventivo (bimensual) ---- */
 .prog-toolbar{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px}
@@ -487,6 +489,8 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
   .prog-filtro, .preop-filtro{padding:9px 14px; font-size:13px}
   .section-toolbar input{max-width:100%}
   .preop-toolbar input[type="search"]{max-width:100%}
+  .section-toolbar-row{flex-direction:column; align-items:stretch}
+  .section-toolbar-row input{flex:none}
 
   .prog-row-main{flex-direction:column; align-items:stretch; gap:8px}
   .prog-row-main .alert-row-fecha{justify-content:space-between}

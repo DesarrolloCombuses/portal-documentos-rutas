@@ -31,6 +31,15 @@ const solicitudesBimensual = document.getElementById("solicitudesBimensual");
 const conductoresGrid = document.getElementById("conductoresGrid");
 const buscarVehiculo = document.getElementById("buscarVehiculo");
 const buscarConductor = document.getElementById("buscarConductor");
+const btnNuevoConductor = document.getElementById("btnNuevoConductor");
+const nuevoConductorModal = document.getElementById("nuevoConductorModal");
+const nuevoConductorClose = document.getElementById("nuevoConductorClose");
+const nuevoConductorCedula = document.getElementById("nuevoConductorCedula");
+const nuevoConductorNombre = document.getElementById("nuevoConductorNombre");
+const nuevoConductorInterno = document.getElementById("nuevoConductorInterno");
+const nuevoConductorVehiculo = document.getElementById("nuevoConductorVehiculo");
+const nuevoConductorMsg = document.getElementById("nuevoConductorMsg");
+const btnGuardarNuevoConductor = document.getElementById("btnGuardarNuevoConductor");
 const secVehiculos = document.getElementById("secVehiculos");
 const secConductores = document.getElementById("secConductores");
 const secProgramacion = document.getElementById("secProgramacion");
@@ -1031,6 +1040,51 @@ document.querySelectorAll(".section-tab").forEach((tab) => {
 });
 buscarVehiculo.addEventListener("input", renderVehiculos);
 buscarConductor.addEventListener("input", renderConductores);
+
+// ---------------- Agregar conductor ----------------
+// El roster de employees para Zamora/Aranjuez estaba muy incompleto (Sonar no
+// tiene esa relacion por ruta), asi que el coordinador -- que si sabe quienes
+// son sus conductores -- los agrega el mismo aqui.
+function abrirNuevoConductorModal(){
+  nuevoConductorCedula.value = "";
+  nuevoConductorNombre.value = "";
+  nuevoConductorInterno.value = "";
+  nuevoConductorVehiculo.value = "";
+  nuevoConductorMsg.textContent = "";
+  nuevoConductorModal.classList.remove("hidden");
+  nuevoConductorCedula.focus();
+}
+function cerrarNuevoConductorModal(){ nuevoConductorModal.classList.add("hidden"); }
+btnNuevoConductor.addEventListener("click", abrirNuevoConductorModal);
+nuevoConductorClose.addEventListener("click", cerrarNuevoConductorModal);
+nuevoConductorModal.addEventListener("click", (ev) => { if (ev.target === nuevoConductorModal) cerrarNuevoConductorModal(); });
+
+btnGuardarNuevoConductor.addEventListener("click", async () => {
+  const cedula = nuevoConductorCedula.value.trim();
+  const nombre = nuevoConductorNombre.value.trim();
+  const numeroInterno = nuevoConductorInterno.value.trim();
+  const vehiculoAsociado = nuevoConductorVehiculo.value.trim();
+  nuevoConductorMsg.textContent = "";
+  if (!cedula || !nombre) { nuevoConductorMsg.textContent = "Indica la cédula y el nombre."; return; }
+  btnGuardarNuevoConductor.disabled = true;
+  btnGuardarNuevoConductor.textContent = "Guardando…";
+  try {
+    await callFn("agregar_conductor", {
+      cedula, nombre,
+      numero_interno: numeroInterno || null,
+      vehiculo_asociado: vehiculoAsociado || null,
+    });
+    showToast("Conductor agregado.", "ok");
+    cerrarNuevoConductorModal();
+    await cargarListado();
+    renderConductores();
+  } catch (err) {
+    nuevoConductorMsg.textContent = err.message || "No se pudo guardar el conductor.";
+  } finally {
+    btnGuardarNuevoConductor.disabled = false;
+    btnGuardarNuevoConductor.textContent = "Guardar conductor";
+  }
+});
 
 // ---------------- Escaneo de tarjetas de despacho ----------------
 function hoyISO(){
