@@ -7,6 +7,17 @@ const SUPABASE_URL = "https://cbplebkmxrkaafqdhiyi.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_DZCceNTENY4ViP17-eZrGg_bdMElZ9X";
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/portal-rutas-documentos`;
 
+// Categorias de licencia de conduccion vigentes en Colombia para transporte
+// publico de pasajeros (Ministerio de Transporte). C2 es la que exige un bus
+// o buseta urbana -- y como una licencia C2 tambien autoriza a manejar
+// vehiculos C1, se deja C2 como la categoria unica por defecto para que
+// todos los conductores queden parejos y no se desordene con texto libre.
+const CATEGORIAS_LICENCIA_BUS = [
+  { valor: "C2", label: "C2 · Busetas y buses de servicio público (estándar)" },
+  { valor: "C1", label: "C1 · Microbuses de servicio público (hasta 19 pasajeros)" },
+  { valor: "C3", label: "C3 · Articulados de servicio público" },
+];
+
 // storageKey propio: este portal vive en el mismo dominio (desarrollocombuses.github.io)
 // que el panel principal, y localStorage se comparte por dominio, no por carpeta. Sin esto,
 // el portal reutiliza (por error) la sesion que el usuario ya tenga abierta en el panel principal.
@@ -915,7 +926,9 @@ function abrirModalConductor(cedula){
         </div>
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="conductor-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
-          <input type="text" class="categoria-lic" placeholder="Categoría (ej. C2)" value="${escapeHtml(d?.categoria_licencia || "")}" style="max-width:120px" />
+          <select class="categoria-lic" style="max-width:220px">
+            ${CATEGORIAS_LICENCIA_BUS.map((cat) => `<option value="${cat.valor}" ${(d?.categoria_licencia || "C2") === cat.valor ? "selected" : ""}>${escapeHtml(cat.label)}</option>`).join("")}
+          </select>
           <input type="date" class="fecha-venc" value="${d?.fecha_vencimiento || ""}" />
           <label class="doc-file-label">📎 <span class="file-txt">Elegir archivo</span>
             <input type="file" class="file-input" accept="application/pdf,image/*" />
