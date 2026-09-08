@@ -929,16 +929,24 @@ function bindDocRowEvents(container, ctx){
         fd.set("tipo", tipo);
         fd.set("fecha_vencimiento", fecha);
         if (file) fd.set("file", file);
+        let resultado = null;
         if (ctx.kind === "flota") {
           fd.set("placa", ctx.placa);
-          await callFnUpload("subir_flota", fd);
+          resultado = await callFnUpload("subir_flota", fd);
         } else {
           fd.set("cedula", ctx.cedula);
           const categoria = row.querySelector(".categoria-lic")?.value || "";
           fd.set("categoria_licencia", categoria);
           await callFnUpload("subir_conductor", fd);
         }
-        showToast(!esPreventivo ? "Documento subido correctamente." : esRealizada ? "Bimensual registrada. Próxima programada automáticamente." : "Fecha programada actualizada.", "ok");
+        // Al renovar la Tecnomecanica el sistema corre tambien la bimensual
+        // sola (el carro ya salio de ruta al taller) -- se avisa aqui para
+        // que el coordinador sepa que no tiene que registrarla aparte.
+        if (resultado?.bimensual_corrida) {
+          showToast(`Documento subido. Bimensual corrida automáticamente: próxima el ${fmtFecha(resultado.bimensual_corrida)}.`, "ok");
+        } else {
+          showToast(!esPreventivo ? "Documento subido correctamente." : esRealizada ? "Bimensual registrada. Próxima programada automáticamente." : "Fecha programada actualizada.", "ok");
+        }
         await cargarListado();
         if (ctx.kind === "flota") abrirModalVehiculo(ctx.placa); else abrirModalConductor(ctx.cedula);
       } catch (err) {
