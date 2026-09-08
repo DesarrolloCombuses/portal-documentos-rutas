@@ -264,6 +264,21 @@ btnLogout.addEventListener("click", async () => {
 
 btnRefresh.addEventListener("click", () => cargarListado());
 
+// Auto-actualizacion: para que las fotos y solicitudes que envian los
+// conductores aparezcan sin que el coordinador tenga que acordarse de tocar
+// "Actualizar" -- se refresca solo al volver a la pestaña y cada 3 minutos
+// mientras la tenga abierta y ya haya iniciado sesion.
+function appVisible(){
+  return !appWrap.classList.contains("hidden");
+}
+function debeAutoActualizar(){
+  return appVisible() && hayConexionAhora();
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && debeAutoActualizar()) cargarListado();
+});
+setInterval(() => { if (debeAutoActualizar()) cargarListado(); }, 3 * 60 * 1000);
+
 async function mostrarApp(){
   authPanel.classList.add("hidden");
   appWrap.classList.remove("hidden");
