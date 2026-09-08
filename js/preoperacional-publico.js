@@ -2,6 +2,9 @@
 // Zamora y Aranjuez - Guadalupe. Reemplaza la vieja app de Google Apps Script.
 // Habla solo con la edge function preoperacional-publico (verify_jwt=false),
 // que valida todo del lado del servidor (no confia en nada del navegador).
+//
+// v2: 9 verificaciones consolidadas (antes 17) para llenarlo en menos de 3
+// minutos, + kilometraje y cedula obligatorios, + decision final Apto/No apto.
 
 const FUNCTION_URL = "https://cbplebkmxrkaafqdhiyi.supabase.co/functions/v1/preoperacional-publico";
 
@@ -9,6 +12,8 @@ const pubFiltroVehiculo = document.getElementById("pubFiltroVehiculo");
 const pubPlaca = document.getElementById("pubPlaca");
 const pubConductor = document.getElementById("pubConductor");
 const pubConductoresList = document.getElementById("pubConductoresList");
+const pubCedula = document.getElementById("pubCedula");
+const pubKilometraje = document.getElementById("pubKilometraje");
 const pubSecciones = document.getElementById("pubSecciones");
 const pubCombustible = document.getElementById("pubCombustible");
 const pubObservaciones = document.getElementById("pubObservaciones");
@@ -16,6 +21,7 @@ const pubFormMsg = document.getElementById("pubFormMsg");
 const btnGuardarPublico = document.getElementById("btnGuardarPublico");
 const publicFormWrap = document.getElementById("publicFormWrap");
 const publicExito = document.getElementById("publicExito");
+const publicExitoIcono = document.getElementById("publicExitoIcono");
 const publicExitoTitulo = document.getElementById("publicExitoTitulo");
 const publicExitoSub = document.getElementById("publicExitoSub");
 const publicEvidenciasWrap = document.getElementById("publicEvidenciasWrap");
@@ -57,53 +63,33 @@ async function callFnUpload(action, formData){
   return body;
 }
 
-// Mismo catalogo de las 17 verificaciones + combustible que usa el portal de
-// coordinadores (js/app.js) -- se repite aqui porque esta pagina es publica y
-// autocontenida (no comparte sesion ni scripts con el panel con login).
+// Checklist consolidado: 9 verificaciones (antes 17) para que llenarlo tome
+// menos de 3 minutos. Mismo catalogo que usa el portal de coordinadores
+// (js/app.js) -- se repite aqui porque esta pagina es publica y autocontenida.
 const PREOP_SECCIONES = [
-  { titulo: "⚗️ Niveles de Fluidos", items: [
-    { key: "aceite", label: "Nivel de Aceite del Motor", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Bajo", label: "⚠️ Bajo" }, { value: "Requiere Cambio", label: "❌ Requiere Cambio" }] },
-    { key: "refrigerante", label: "Nivel de Refrigerante", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Bajo", label: "⚠️ Bajo" }, { value: "Falta", label: "❌ Falta" }] },
-    { key: "frenos", label: "Nivel de Líquido de Frenos", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Bajo", label: "⚠️ Bajo" }, { value: "Requiere Cambio", label: "❌ Requiere Cambio" }] },
+  { titulo: "🔧 Motor y Rodamiento", items: [
+    { key: "fluidos", label: "Niveles de Fluidos (aceite, refrigerante, líquido de frenos)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Alguno bajo", label: "⚠️ Alguno bajo" }, { value: "Falta alguno o requiere cambio", label: "❌ Falta alguno o requiere cambio" }] },
+    { key: "llantas", label: "Llantas (presión y desgaste)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Presión baja o desgaste visible", label: "⚠️ Presión baja o desgaste visible" }, { value: "Llanta lisa o desinflada", label: "❌ Llanta lisa o desinflada" }] },
+    { key: "frenos", label: "Frenos (servicio y estacionamiento)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Se sienten suaves o flojos", label: "⚠️ Se sienten suaves o flojos" }, { value: "No frenan bien", label: "❌ No frenan bien" }] },
   ]},
-  { titulo: "🌀 Neumáticos", items: [
-    { key: "neumaticos", label: "Presión de Neumáticos", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Baja", label: "⚠️ Baja" }, { value: "Desinflado", label: "❌ Desinflado" }] },
-    { key: "desgaste", label: "Desgaste de Neumáticos", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Desgastado", label: "⚠️ Desgastado" }, { value: "Peligroso", label: "❌ Peligroso" }] },
-  ]},
-  { titulo: "💡 Sistema de Iluminación", items: [
-    { key: "lucesDelanteras", label: "Luces Delanteras", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Una No Sirve", label: "⚠️ Una No Sirve" }, { value: "No Encienden", label: "❌ No Encienden" }] },
-    { key: "lucesTraseras", label: "Luces Traseras y Stop", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Una No Sirve", label: "⚠️ Una No Sirve" }, { value: "No Encienden", label: "❌ No Encienden" }] },
-    { key: "direccionales", label: "Direccionales e Intermitentes", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Alguna Fallando", label: "⚠️ Alguna Fallando" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
-  ]},
-  { titulo: "🛑 Sistema de Frenos", items: [
-    { key: "frenosServicio", label: "Frenos de Servicio", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Suaves", label: "⚠️ Suaves" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
-    { key: "frenoEstacionamiento", label: "Freno de Estacionamiento", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Flojo", label: "⚠️ Flojo" }, { value: "No Funciona", label: "❌ No Funciona" }] },
-  ]},
-  { titulo: "🛡️ Elementos de Seguridad", items: [
-    { key: "espejos", label: "Espejos Retrovisores", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Ajustar", label: "⚠️ Requiere Ajuste" }, { value: "Dañado", label: "❌ Dañado" }] },
-    { key: "limpiaparabrisas", label: "Limpiaparabrisas", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "No Limpian Bien", label: "⚠️ No Limpian Bien" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
+  { titulo: "💡 Visibilidad y Seguridad Interior", items: [
+    { key: "luces", label: "Luces (delanteras, traseras, direccionales)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Alguna no sirve", label: "⚠️ Alguna no sirve" }, { value: "Varias no encienden", label: "❌ Varias no encienden" }] },
+    { key: "visibilidad", label: "Visibilidad (espejos y limpiaparabrisas)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Requiere ajuste o no limpia bien", label: "⚠️ Requiere ajuste o no limpia bien" }, { value: "Dañado o no funciona", label: "❌ Dañado o no funciona" }] },
     { key: "cinturones", label: "Cinturones de Seguridad", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Alguno Dañado", label: "⚠️ Alguno Dañado" }, { value: "No Funcionan", label: "❌ No Funcionan" }] },
-    { key: "extintor", label: "Extintor", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Vencido", label: "⚠️ Vencido" }, { value: "Falta", label: "❌ Falta" }] },
-    { key: "botiquin", label: "Botiquín de Primeros Auxilios", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Incompleto", label: "⚠️ Incompleto" }, { value: "Falta", label: "❌ Falta" }] },
-    { key: "triangulos", label: "Triángulos de Emergencia", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Falta Uno", label: "⚠️ Falta Uno" }, { value: "Faltan", label: "❌ Faltan" }] },
-    { key: "documentacion", label: "Documentación en Orden", opciones: [
-      { value: "OK", label: "✅ OK" }, { value: "Falta Alguna", label: "⚠️ Falta Alguna" }, { value: "Vencida", label: "❌ Vencida" }] },
+      { value: "OK", label: "✅ OK" }, { value: "Alguno dañado", label: "⚠️ Alguno dañado" }, { value: "No funcionan", label: "❌ No funcionan" }] },
+  ]},
+  { titulo: "🚪 Emergencia, Puertas y Documentos", items: [
+    { key: "emergencia", label: "Equipo de Emergencia (extintor, botiquín, triángulos, chaleco, linterna)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Algo incompleto o vencido", label: "⚠️ Algo incompleto o vencido" }, { value: "Falta extintor o botiquín", label: "❌ Falta extintor o botiquín" }] },
+    { key: "puertas", label: "Puertas, Salidas de Emergencia y Pasamanos", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Pasamanos flojo o puerta dura", label: "⚠️ Pasamanos flojo o puerta dura" }, { value: "No cierra bien o no hay salida de emergencia", label: "❌ No cierra bien o no hay salida de emergencia" }] },
+    { key: "documentacion", label: "Documentos del Vehículo (SOAT, Tecnomecánica, Tarjeta de Operación)", opciones: [
+      { value: "OK", label: "✅ OK" }, { value: "Alguno por vencer", label: "⚠️ Alguno por vencer" }, { value: "Alguno vencido o falta", label: "❌ Alguno vencido o falta" }] },
   ]},
 ];
 const PREOP_COMBUSTIBLE_ITEM = { key: "combustible", label: "Nivel de Combustible", opciones: [
@@ -111,6 +97,16 @@ const PREOP_COMBUSTIBLE_ITEM = { key: "combustible", label: "Nivel de Combustibl
   { value: "1/4", label: "⛽ 1/4" }, { value: "Reserva", label: "⚠️ Reserva" }] };
 const PREOP_LABELS = {};
 PREOP_SECCIONES.forEach((s) => s.items.forEach((it) => { PREOP_LABELS[it.key] = it.label; }));
+
+// Decision final que exige la practica estandar colombiana de inspeccion
+// preoperacional (Apto / Apto con observaciones / No apto), calculada del
+// estado_general que ya valido el servidor -- no se le pregunta al conductor,
+// para no sumarle otro paso al formulario.
+const DECISION = {
+  OK: { icono: "✅", titulo: "Vehículo APTO para operar", kind: "ok" },
+  ALERTA: { icono: "⚠️", titulo: "Vehículo APTO CON OBSERVACIONES", kind: "warn" },
+  CRITICO: { icono: "❌", titulo: "Vehículo NO APTO — no debe salir a operar hasta corregir", kind: "err" },
+};
 
 function renderPreopRadioGroup(item){
   return `
@@ -166,16 +162,28 @@ async function cargarCatalogo(){
 }
 cargarCatalogo();
 
+// Si el nombre escrito coincide con un conductor conocido, autocompleta la
+// cédula para ahorrarle el tecleo (sigue siendo editable).
+pubConductor.addEventListener("change", () => {
+  if (pubCedula.value.trim()) return;
+  const match = conductores.find((c) => (c.nombre || "").trim().toLowerCase() === pubConductor.value.trim().toLowerCase());
+  if (match?.cedula) pubCedula.value = match.cedula;
+});
+
 // ---------------- Guardar ----------------
 btnGuardarPublico.addEventListener("click", async () => {
   pubFormMsg.textContent = "";
   const placa = pubPlaca.value;
   const conductorNombre = pubConductor.value.trim();
+  const conductorCedula = pubCedula.value.trim();
+  const kilometraje = pubKilometraje.value;
+
   if (!placa) { pubFormMsg.textContent = "Selecciona el vehículo."; return; }
   if (!conductorNombre) { pubFormMsg.textContent = "Escribe tu nombre."; return; }
+  if (!conductorCedula) { pubFormMsg.textContent = "Escribe tu cédula."; return; }
+  if (kilometraje === "" || Number(kilometraje) < 0) { pubFormMsg.textContent = "Indica el kilometraje del vehículo."; return; }
 
-  const conductorMatch = conductores.find((c) => (c.nombre || "").trim().toLowerCase() === conductorNombre.toLowerCase());
-  const payload = { placa, conductor_nombre: conductorNombre, conductor_cedula: conductorMatch?.cedula || null };
+  const payload = { placa, conductor_nombre: conductorNombre, conductor_cedula: conductorCedula, kilometraje: Number(kilometraje) };
 
   const todosLosItems = PREOP_SECCIONES.flatMap((s) => s.items).concat([PREOP_COMBUSTIBLE_ITEM]);
   let faltan = false;
@@ -216,8 +224,12 @@ function mostrarExito(preoperacional, alertas){
   publicFormWrap.classList.add("hidden");
   publicExito.classList.remove("hidden");
   window.scrollTo(0, 0);
-  publicExitoTitulo.textContent = alertas.length ? "Checklist guardado, con novedades" : "✅ Checklist guardado";
-  publicExitoSub.textContent = `${preoperacional.placa} · ${preoperacional.conductor_nombre}`;
+
+  const decision = DECISION[preoperacional.estado_general] || DECISION.OK;
+  publicExitoIcono.textContent = decision.icono;
+  publicExitoTitulo.textContent = decision.titulo;
+  publicExitoTitulo.style.color = decision.kind === "err" ? "var(--err)" : decision.kind === "warn" ? "var(--warn)" : "var(--ok)";
+  publicExitoSub.textContent = `${preoperacional.placa} · ${preoperacional.conductor_nombre} · Km ${preoperacional.kilometraje ?? "—"}`;
 
   if (!alertas.length) {
     publicEvidenciasWrap.innerHTML = "";
@@ -267,6 +279,8 @@ btnOtroChecklist.addEventListener("click", () => {
   publicFormWrap.classList.remove("hidden");
   pubPlaca.value = "";
   pubConductor.value = "";
+  pubCedula.value = "";
+  pubKilometraje.value = "";
   pubFiltroVehiculo.value = "";
   pubObservaciones.value = "";
   renderVehiculoOptions();

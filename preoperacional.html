@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#0078d4" />
 <link rel="icon" href="icons/icon-192.svg" />
 <link rel="apple-touch-icon" href="icons/icon-192.svg" />
-<link rel="stylesheet" href="css/styles.css?v=1.8.0" />
+<link rel="stylesheet" href="css/styles.css?v=1.9.0" />
 </head>
 <body>
 
@@ -36,6 +36,14 @@
           <input type="text" id="pubConductor" list="pubConductoresList" placeholder="Escribe tu nombre completo" required autocomplete="off" />
           <datalist id="pubConductoresList"></datalist>
         </div>
+        <div class="preop-form-field">
+          <label>Cédula *</label>
+          <input type="text" inputmode="numeric" id="pubCedula" placeholder="Tu número de cédula" required autocomplete="off" />
+        </div>
+        <div class="preop-form-field">
+          <label>Kilometraje del vehículo *</label>
+          <input type="number" inputmode="numeric" min="0" id="pubKilometraje" placeholder="Ej. 152340" required />
+        </div>
       </div>
 
       <div id="pubSecciones"></div>
@@ -52,7 +60,7 @@
     </div>
 
     <div id="publicExito" class="hidden">
-      <div class="public-exito-icon">✅</div>
+      <div class="public-exito-icon" id="publicExitoIcono">✅</div>
       <h2 id="publicExitoTitulo">Checklist guardado</h2>
       <p class="muted" id="publicExitoSub"></p>
       <div id="publicEvidenciasWrap"></div>
@@ -63,6 +71,6 @@
 
 <div id="toast" class="toast hidden"></div>
 
-<script src="js/preoperacional-publico.js?v=1.8.0"></script>
+<script src="js/preoperacional-publico.js?v=1.9.0"></script>
 </body>
 </html>
