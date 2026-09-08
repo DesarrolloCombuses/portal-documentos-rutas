@@ -551,7 +551,7 @@ function renderProgramacion(){
             <input type="date" class="prog-fecha-hecha" value="${hoyISO()}" />
             <span class="prog-fecha-hint muted">Fecha en que se hizo</span>
           </div>
-          <label class="doc-file-label prog-file-label">📎 <span class="file-txt">Foto de la preventiva (opcional)</span>
+          <label class="doc-file-label prog-file-label">📎 <span class="file-txt">Foto de la preventiva (obligatoria)</span>
             <input type="file" class="prog-file-input" accept="application/pdf,image/*" />
           </label>
           <button class="btn btn-primary btn-sm prog-btn-confirmar">✅ Registrar preventiva hecha</button>
@@ -566,7 +566,7 @@ function renderProgramacion(){
   progList.querySelectorAll(".prog-file-input").forEach((input) => {
     input.addEventListener("change", () => {
       const txt = input.closest(".prog-file-label").querySelector(".file-txt");
-      txt.textContent = input.files?.[0]?.name || "Foto de la preventiva (opcional)";
+      txt.textContent = input.files?.[0]?.name || "Foto de la preventiva (obligatoria)";
     });
   });
   progList.querySelectorAll(".prog-btn-registrar").forEach((btn) => {
@@ -606,6 +606,7 @@ function renderProgramacion(){
       const esRealizada = inline.querySelector(".prog-modo-realizada").checked;
       const file = inline.querySelector(".prog-file-input").files?.[0];
       if (!fechaInput) { showToast("Indica la fecha.", "err"); return; }
+      if (esRealizada && !file) { showToast("Debes adjuntar la foto de la preventiva.", "err"); return; }
       const fechaVencimiento = esRealizada ? addMonthsISO(fechaInput, 2) : fechaInput;
       btn.disabled = true;
       btn.textContent = "Guardando…";
@@ -614,6 +615,7 @@ function renderProgramacion(){
         fd.set("placa", placa);
         fd.set("tipo", "MANTENIMIENTO_PREVENTIVO");
         fd.set("fecha_vencimiento", fechaVencimiento);
+        fd.set("modo", esRealizada ? "hecha" : "reprogramar");
         if (esRealizada && file) fd.set("file", file);
         await callFnUpload("subir_flota", fd);
         showToast(esRealizada ? "Preventiva registrada. Próxima programada automáticamente." : "Fecha reprogramada (no se registró que se hizo).", "ok");
@@ -793,7 +795,7 @@ function abrirModalVehiculo(placa){
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
           <button class="btn btn-sm btn-ghost btn-ver-historial">📜 Ver historial</button>
           <input type="date" class="fecha-venc" data-preventivo="1" title="Fecha" />
-          <label class="doc-file-label file-label-hecha">📎 <span class="file-txt">Foto de la preventiva (opcional)</span>
+          <label class="doc-file-label file-label-hecha">📎 <span class="file-txt">Foto de la preventiva (obligatoria)</span>
             <input type="file" class="file-input" accept="application/pdf,image/*" />
           </label>
           <button class="btn btn-primary btn-sm btn-subir">✅ Registrar preventiva hecha</button>
@@ -967,6 +969,7 @@ function bindDocRowEvents(container, ctx){
       const textoOriginal = btn.textContent;
       if (esPreventivo) {
         if (!fecha) { showToast("Indica la fecha.", "err"); return; }
+        if (esRealizada && !file) { showToast("Debes adjuntar la foto de la preventiva.", "err"); return; }
         if (esRealizada) fecha = addMonthsISO(fecha, 2);
       } else if (!file) {
         showToast("Selecciona un archivo antes de subir.", "err");
@@ -978,6 +981,7 @@ function bindDocRowEvents(container, ctx){
         const fd = new FormData();
         fd.set("tipo", tipo);
         fd.set("fecha_vencimiento", fecha);
+        if (esPreventivo) fd.set("modo", esRealizada ? "hecha" : "reprogramar");
         if (file && (!esPreventivo || esRealizada)) fd.set("file", file);
         let resultado = null;
         if (ctx.kind === "flota") {
