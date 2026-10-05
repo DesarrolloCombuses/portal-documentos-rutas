@@ -284,14 +284,16 @@ function renderDocumentosVehiculo(placa, documentos, bimensual){
     <div class="preop-docs-list">
       ${documentos.map((d) => {
         const info = DOC_ESTADO_INFO[d.estado] || DOC_ESTADO_INFO.SIN_DOCUMENTO;
-        const necesitaFoto = d.estado !== "VIGENTE" || d.solicitada;
+        const necesitaFoto = d.estado !== "VIGENTE" || d.solicitada || !!d.rechazo;
         const fecha = fmtFechaDoc(d.fecha_vencimiento);
+        const claseFila = d.rechazo ? " preop-doc-row-rechazada" : d.solicitada ? " preop-doc-row-solicitada" : "";
         return `
-          <div class="preop-doc-row${d.solicitada ? " preop-doc-row-solicitada" : ""}" data-tipo="${escapeHtml(d.tipo)}">
+          <div class="preop-doc-row${claseFila}" data-tipo="${escapeHtml(d.tipo)}">
             <div class="preop-doc-row-info">
               <b>${info.icono} ${escapeHtml(d.label)}</b>
               <span class="muted">${info.texto}${fecha ? ` · ${fecha}` : ""}</span>
-              ${d.solicitada ? `<span class="preop-doc-solicitada-nota">📸 Tu coordinador te pidió esta foto</span>` : ""}
+              ${d.rechazo ? `<span class="preop-doc-rechazo-nota">❌ Tu coordinador rechazó la foto que enviaste${d.rechazo.motivo ? `: “${escapeHtml(d.rechazo.motivo)}”` : ""}. Envía una nueva.</span>` : ""}
+              ${d.solicitada && !d.rechazo ? `<span class="preop-doc-solicitada-nota">📸 Tu coordinador te pidió esta foto</span>` : ""}
             </div>
             ${necesitaFoto ? `
               <label class="btn btn-sm btn-ghost preop-doc-btn-foto">
@@ -318,6 +320,8 @@ function renderDocumentosVehiculo(placa, documentos, bimensual){
         fd.set("file", file);
         await callFnUpload("subir_documento_vehiculo", fd);
         row.querySelector(".preop-doc-btn-foto")?.remove();
+        row.querySelector(".preop-doc-rechazo-nota")?.remove();
+        row.classList.remove("preop-doc-row-rechazada");
         row.insertAdjacentHTML("beforeend", `<span style="font-size:12px;color:var(--ok);font-weight:700">✅ Enviada, tu coordinador la revisará</span>`);
         showToast("Foto enviada al coordinador.", "ok");
       } catch (err) {

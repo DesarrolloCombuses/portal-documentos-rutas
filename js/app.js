@@ -428,7 +428,7 @@ function renderDocumentosPendientes(){
       <div class="doc-row-head">
         <span class="doc-row-title">📸 Fotos enviadas por conductores (${pendientes.length} pendiente${pendientes.length === 1 ? "" : "s"} de revisar)</span>
       </div>
-      <div class="doc-row-hint">Un conductor vio un documento vencido o por vencer en su checklist y envió esta foto. Revísala y, si aplica, sube el documento oficial con su fecha real desde la tarjeta del vehículo.</div>
+      <div class="doc-row-hint">Un conductor vio un documento vencido o por vencer en su checklist y envió esta foto. Revísala y, si aplica, sube el documento oficial con su fecha real desde la tarjeta del vehículo. Si no sirve (borrosa, documento equivocado), recházala: el conductor verá el motivo en su checklist.</div>
       <div class="preop-docs-list" style="margin-top:8px">
         ${pendientes.map((p) => `
           <div class="preop-doc-row" data-id="${escapeHtml(p.id)}">
@@ -439,6 +439,7 @@ function renderDocumentosPendientes(){
             <div class="doc-row-actions">
               <button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(p.storage_path)}">👁 Ver foto</button>
               <button class="btn btn-sm btn-primary btn-marcar-revisado">✅ Marcar revisado</button>
+              <button class="btn btn-sm btn-rechazar">❌ Rechazar</button>
             </div>
           </div>`).join("")}
       </div>
@@ -455,6 +456,22 @@ function renderDocumentosPendientes(){
         await cargarListado();
       } catch (err) {
         showToast(err.message || "No se pudo marcar como revisado.", "err");
+        btn.disabled = false;
+      }
+    });
+  });
+  docsPendientesConductor.querySelectorAll(".btn-rechazar").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const documentoId = btn.closest(".preop-doc-row").getAttribute("data-id");
+      const motivo = (window.prompt("¿Por qué rechazas esta foto? El conductor verá este motivo en su checklist.\n\nEj.: Foto borrosa, no se lee la fecha", "") || "").trim();
+      if (!motivo) return;
+      btn.disabled = true;
+      try {
+        await callFn("rechazar_documento_conductor", { documento_id: documentoId, motivo });
+        showToast("Foto rechazada. El conductor verá el motivo en su checklist.", "ok");
+        await cargarListado();
+      } catch (err) {
+        showToast(err.message || "No se pudo rechazar la foto.", "err");
         btn.disabled = false;
       }
     });
