@@ -195,7 +195,8 @@ function fmtFecha(iso){
   return d && m && y ? `${d}/${m}/${y}` : iso;
 }
 
-function estadoLabel(estado){
+function estadoLabel(estado, tipoCfg){
+  if (tipoCfg?.sin_vencimiento && estado) return "Cargada";
   return { VIGENTE:"Vigente", POR_VENCER:"Por vencer", VENCIDO:"Vencido", SIN_FECHA:"Sin fecha" }[estado] || "Sin archivo";
 }
 function estadoClass(estado){
@@ -763,7 +764,7 @@ function renderVehiculos(){
             const est = d ? d.estado_vencimiento : null;
             return `<div class="mini-doc">
               <span class="mini-doc-label">${escapeHtml(t.label)}</span>
-              <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
+              <span class="status-pill ${estadoClass(est)}">${estadoLabel(est, t)}</span>
             </div>`;
           }).join("")}
         </div>
@@ -830,7 +831,9 @@ function abrirModalVehiculo(placa){
     const esPreventivo = t.tipo === "MANTENIMIENTO_PREVENTIVO";
     const metaHtml = esPreventivo
       ? (d?.fecha_vencimiento ? `Próxima bimensual programada: <b>${fmtFecha(d.fecha_vencimiento)}</b>` : "Todavía no hay bimensual registrada.")
-      : docMetaHtml(d);
+      : t.sin_vencimiento
+        ? (d ? `No vence · ${escapeHtml(d.nombre_archivo_original || "archivo cargado")}` : "Sin documento registrado. No vence: solo sube el archivo.")
+        : docMetaHtml(d);
     const solicitud = tiposConductor.has(t.tipo) ? solicitudFotoActiva(placa, t.tipo) : null;
     const botonPedirFoto = !tiposConductor.has(t.tipo) ? "" : solicitud
       ? `<button class="btn btn-sm btn-ghost" disabled title="Esperando a que el conductor la envíe">⏳ Foto solicitada</button>`
@@ -861,7 +864,7 @@ function abrirModalVehiculo(placa){
         <div class="doc-row-actions">
           ${d?.storage_path ? `<button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(d.storage_path)}">👁 Ver archivo</button>` : ""}
           ${botonPedirFoto}
-          <input type="date" class="fecha-venc" value="${d?.fecha_vencimiento || ""}" />
+          ${t.sin_vencimiento ? "" : `<input type="date" class="fecha-venc" value="${d?.fecha_vencimiento || ""}" />`}
           <label class="doc-file-label">📎 <span class="file-txt">Elegir archivo</span>
             <input type="file" class="file-input" accept="application/pdf,image/*" />
           </label>
@@ -871,7 +874,7 @@ function abrirModalVehiculo(placa){
       <div class="doc-row" data-tipo="${escapeHtml(t.tipo)}" data-doc-id="${escapeHtml(d?.id || "")}" data-fecha-actual="${escapeHtml(d?.fecha_vencimiento || "")}">
         <div class="doc-row-head">
           <span class="doc-row-title">${escapeHtml(t.label)}</span>
-          <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
+          <span class="status-pill ${estadoClass(est)}">${estadoLabel(est, t)}</span>
         </div>
         <div class="doc-row-meta">${metaHtml}</div>
         ${accionesHtml}
@@ -1043,7 +1046,7 @@ function bindDocRowEvents(container, ctx){
       const tipo = row.getAttribute("data-tipo");
       const esPreventivo = tipo === "MANTENIMIENTO_PREVENTIVO";
       const file = row.querySelector(".file-input").files?.[0];
-      let fecha = row.querySelector(".fecha-venc").value || "";
+      let fecha = row.querySelector(".fecha-venc")?.value || "";
       const esRealizada = row.querySelector(".modo-realizada")?.checked;
       const textoOriginal = btn.textContent;
       if (!esPreventivo && esSoloCambioFecha(row)) {
@@ -1074,9 +1077,11 @@ function bindDocRowEvents(container, ctx){
         if (esRealizada && !file) { showToast("Debes adjuntar la foto de la preventiva.", "err"); return; }
         if (esRealizada) fecha = addMonthsISO(fecha, 2);
       } else if (!file) {
-        showToast(row.getAttribute("data-doc-id")
-          ? "Cambia la fecha para corregirla, o elige un archivo nuevo para subir."
-          : "Este documento todavía no existe: elige el archivo y la fecha para subirlo.", "err");
+        showToast(!row.querySelector(".fecha-venc")
+          ? "Elige el archivo para subirlo."
+          : row.getAttribute("data-doc-id")
+            ? "Cambia la fecha para corregirla, o elige un archivo nuevo para subir."
+            : "Este documento todavía no existe: elige el archivo y la fecha para subirlo.", "err");
         return;
       }
       btn.disabled = true;
