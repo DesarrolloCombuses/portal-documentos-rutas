@@ -835,7 +835,7 @@ function abrirModalVehiculo(placa){
           <button class="btn btn-primary btn-sm btn-subir">Subir</button>
         </div>`;
     return `
-      <div class="doc-row" data-tipo="${escapeHtml(t.tipo)}">
+      <div class="doc-row" data-tipo="${escapeHtml(t.tipo)}" data-doc-id="${escapeHtml(d?.id || "")}" data-fecha-actual="${escapeHtml(d?.fecha_vencimiento || "")}">
         <div class="doc-row-head">
           <span class="doc-row-title">${escapeHtml(t.label)}</span>
           <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
@@ -917,7 +917,7 @@ function abrirModalConductor(cedula){
     const d = docFor(currentData.documentos_conductor, (x) => x.cedula === cedula && x.tipo === t.tipo);
     const est = d ? d.estado_vencimiento : null;
     return `
-      <div class="doc-row" data-tipo="${escapeHtml(t.tipo)}">
+      <div class="doc-row" data-tipo="${escapeHtml(t.tipo)}" data-doc-id="${escapeHtml(d?.id || "")}" data-fecha-actual="${escapeHtml(d?.fecha_vencimiento || "")}">
         <div class="doc-row-head">
           <span class="doc-row-title">${escapeHtml(t.label)}</span>
           <span class="status-pill ${estadoClass(est)}">${estadoLabel(est)}</span>
@@ -943,12 +943,33 @@ function abrirModalConductor(cedula){
   docModal.classList.remove("hidden");
 }
 
+// Sin archivo nuevo pero con otra fecha = solo se corrige la fecha del
+// documento ya cargado; el boton lo dice para que no haya duda.
+function esSoloCambioFecha(row){
+  if (row.getAttribute("data-tipo") === "MANTENIMIENTO_PREVENTIVO") return false;
+  const file = row.querySelector(".file-input")?.files?.[0];
+  const fecha = row.querySelector(".fecha-venc")?.value || "";
+  const docId = row.getAttribute("data-doc-id");
+  return !file && !!docId && !!fecha && fecha !== row.getAttribute("data-fecha-actual");
+}
+
+function actualizarBotonSubir(row){
+  const btn = row.querySelector(".btn-subir");
+  if (!btn || row.getAttribute("data-tipo") === "MANTENIMIENTO_PREVENTIVO") return;
+  btn.textContent = esSoloCambioFecha(row) ? "💾 Guardar fecha" : "Subir";
+}
+
 function bindDocRowEvents(container, ctx){
   container.querySelectorAll(".file-input").forEach((input) => {
     input.addEventListener("change", () => {
       const txt = input.closest(".doc-file-label").querySelector(".file-txt");
       txt.textContent = input.files?.[0]?.name || "Elegir archivo";
+      actualizarBotonSubir(input.closest(".doc-row"));
     });
+  });
+  container.querySelectorAll(".fecha-venc").forEach((input) => {
+    input.addEventListener("input", () => actualizarBotonSubir(input.closest(".doc-row")));
+    input.addEventListener("change", () => actualizarBotonSubir(input.closest(".doc-row")));
   });
   container.querySelectorAll(".ver-archivo").forEach((a) => {
     a.addEventListener("click", async (ev) => {
@@ -992,12 +1013,37 @@ function bindDocRowEvents(container, ctx){
       let fecha = row.querySelector(".fecha-venc").value || "";
       const esRealizada = row.querySelector(".modo-realizada")?.checked;
       const textoOriginal = btn.textContent;
+      if (!esPreventivo && esSoloCambioFecha(row)) {
+        btn.disabled = true;
+        btn.textContent = "Guardando…";
+        try {
+          const { fecha_mostrada } = await callFn("corregir_fecha", {
+            kind: ctx.kind,
+            id: row.getAttribute("data-doc-id"),
+            fecha_vencimiento: fecha,
+          });
+          if (fecha_mostrada && fecha_mostrada !== fecha) {
+            showToast(`Fecha guardada, pero hay otro registro más reciente (${fmtFecha(fecha_mostrada)}) que sigue mandando. Revisa el historial.`, "err");
+          } else {
+            showToast("Fecha actualizada.", "ok");
+          }
+          await cargarListado();
+          if (ctx.kind === "flota") abrirModalVehiculo(ctx.placa); else abrirModalConductor(ctx.cedula);
+        } catch (err) {
+          showToast(err.message || "No se pudo guardar la fecha.", "err");
+          btn.disabled = false;
+          btn.textContent = textoOriginal;
+        }
+        return;
+      }
       if (esPreventivo) {
         if (!fecha) { showToast("Indica la fecha.", "err"); return; }
         if (esRealizada && !file) { showToast("Debes adjuntar la foto de la preventiva.", "err"); return; }
         if (esRealizada) fecha = addMonthsISO(fecha, 2);
       } else if (!file) {
-        showToast("Selecciona un archivo antes de subir.", "err");
+        showToast(row.getAttribute("data-doc-id")
+          ? "Cambia la fecha para corregirla, o elige un archivo nuevo para subir."
+          : "Este documento todavía no existe: elige el archivo y la fecha para subirlo.", "err");
         return;
       }
       btn.disabled = true;
