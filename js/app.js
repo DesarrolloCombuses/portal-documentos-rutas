@@ -413,14 +413,21 @@ function renderResumen(){
 // documento vencido o por vencer -- el coordinador las revisa aqui y, si hace
 // falta, registra el documento oficial (con su fecha real) desde su tarjeta.
 function renderDocumentosPendientes(){
-  const pendientes = currentData?.documentos_pendientes_conductor || [];
+  const tiposF = currentData?.tipos_flota || [];
+  const labelTipo = (tipo) => tiposF.find((t) => t.tipo === tipo)?.label || tipo;
+  const pendientes = [
+    ...(currentData?.documentos_pendientes_conductor || []).map((p) => ({
+      ...p, kind: "vehiculo", bucket: "flota-documentos", titulo: `${labelTipo(p.tipo)} · ${p.placa}`,
+    })),
+    ...(currentData?.licencias_pendientes_conductor || []).map((p) => ({
+      ...p, kind: "licencia", bucket: "conductor-documentos", titulo: `🪪 Licencia de Conducción · ${p.nombre_conductor || "Conductor"} (CC ${p.cedula})`,
+    })),
+  ].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
   if (!pendientes.length) {
     docsPendientesConductor.classList.add("hidden");
     docsPendientesConductor.innerHTML = "";
     return;
   }
-  const tiposF = currentData?.tipos_flota || [];
-  const labelTipo = (tipo) => tiposF.find((t) => t.tipo === tipo)?.label || tipo;
 
   docsPendientesConductor.classList.remove("hidden");
   docsPendientesConductor.innerHTML = `
@@ -428,16 +435,16 @@ function renderDocumentosPendientes(){
       <div class="doc-row-head">
         <span class="doc-row-title">📸 Fotos enviadas por conductores (${pendientes.length} pendiente${pendientes.length === 1 ? "" : "s"} de revisar)</span>
       </div>
-      <div class="doc-row-hint">Un conductor vio un documento vencido o por vencer en su checklist y envió esta foto. Revísala y, si aplica, sube el documento oficial con su fecha real desde la tarjeta del vehículo. Si no sirve (borrosa, documento equivocado), recházala: el conductor verá el motivo en su checklist.</div>
+      <div class="doc-row-hint">Un conductor envió esta foto desde su checklist. Revísala y, si aplica, sube el documento oficial con su fecha real (del vehículo en su tarjeta; la licencia en la ficha del conductor, pestaña Conductores). Si no sirve (borrosa, documento equivocado), recházala: el conductor verá el motivo en su checklist.</div>
       <div class="preop-docs-list" style="margin-top:8px">
         ${pendientes.map((p) => `
-          <div class="preop-doc-row" data-id="${escapeHtml(p.id)}">
+          <div class="preop-doc-row" data-id="${escapeHtml(p.id)}" data-kind="${p.kind}">
             <div class="preop-doc-row-info">
-              <b>${escapeHtml(labelTipo(p.tipo))} · ${escapeHtml(p.placa)}</b>
+              <b>${escapeHtml(p.titulo)}</b>
               <span class="muted">Enviada ${new Date(p.created_at).toLocaleString("es-CO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
             </div>
             <div class="doc-row-actions">
-              <button class="btn btn-sm btn-ver ver-archivo" data-bucket="flota-documentos" data-path="${escapeHtml(p.storage_path)}">👁 Ver foto</button>
+              <button class="btn btn-sm btn-ver ver-archivo" data-bucket="${p.bucket}" data-path="${escapeHtml(p.storage_path)}">👁 Ver foto</button>
               <button class="btn btn-sm btn-primary btn-marcar-revisado">✅ Marcar revisado</button>
               <button class="btn btn-sm btn-rechazar">❌ Rechazar</button>
             </div>
@@ -448,10 +455,11 @@ function renderDocumentosPendientes(){
   bindDocRowEvents(docsPendientesConductor, {});
   docsPendientesConductor.querySelectorAll(".btn-marcar-revisado").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const documentoId = btn.closest(".preop-doc-row").getAttribute("data-id");
+      const fila = btn.closest(".preop-doc-row");
+      const documentoId = fila.getAttribute("data-id");
       btn.disabled = true;
       try {
-        await callFn("marcar_documento_revisado", { documento_id: documentoId });
+        await callFn("marcar_documento_revisado", { documento_id: documentoId, kind: fila.getAttribute("data-kind") });
         showToast("Marcado como revisado.", "ok");
         await cargarListado();
       } catch (err) {
@@ -462,12 +470,13 @@ function renderDocumentosPendientes(){
   });
   docsPendientesConductor.querySelectorAll(".btn-rechazar").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const documentoId = btn.closest(".preop-doc-row").getAttribute("data-id");
+      const fila = btn.closest(".preop-doc-row");
+      const documentoId = fila.getAttribute("data-id");
       const motivo = (window.prompt("¿Por qué rechazas esta foto? El conductor verá este motivo en su checklist.\n\nEj.: Foto borrosa, no se lee la fecha", "") || "").trim();
       if (!motivo) return;
       btn.disabled = true;
       try {
-        await callFn("rechazar_documento_conductor", { documento_id: documentoId, motivo });
+        await callFn("rechazar_documento_conductor", { documento_id: documentoId, motivo, kind: fila.getAttribute("data-kind") });
         showToast("Foto rechazada. El conductor verá el motivo en su checklist.", "ok");
         await cargarListado();
       } catch (err) {

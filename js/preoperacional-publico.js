@@ -16,6 +16,7 @@ const pubConductor = document.getElementById("pubConductor");
 const pubConductorConfirmado = document.getElementById("pubConductorConfirmado");
 const pubConductorConfirmadoNombre = document.getElementById("pubConductorConfirmadoNombre");
 const btnCambiarConductor = document.getElementById("btnCambiarConductor");
+const pubLicenciaConductor = document.getElementById("pubLicenciaConductor");
 const pubCedula = document.getElementById("pubCedula");
 const pubKilometraje = document.getElementById("pubKilometraje");
 const btnAyuda = document.getElementById("btnAyuda");
@@ -355,6 +356,65 @@ function renderDocumentosVehiculo(placa, documentos, bimensual){
   });
 }
 
+// ---------------- Licencia de conduccion del propio conductor ----------------
+// Va separada de los documentos del vehiculo para que el conductor no mande su
+// licencia como si fuera un papel del carro.
+async function cargarLicenciaConductor(cedula, nombre){
+  if (!cedula) return;
+  pubLicenciaConductor.classList.remove("hidden");
+  pubLicenciaConductor.innerHTML = `<div class="muted" style="font-size:12.5px">Consultando tu licencia de conducción…</div>`;
+  let lic;
+  try {
+    lic = await callFn("licencia_conductor", { cedula });
+  } catch {
+    pubLicenciaConductor.innerHTML = "";
+    pubLicenciaConductor.classList.add("hidden");
+    return;
+  }
+  if (pubCedula.value.trim() !== cedula) return;
+  const info = DOC_ESTADO_INFO[lic.estado] || DOC_ESTADO_INFO.SIN_DOCUMENTO;
+  const fecha = fmtFechaDoc(lic.fecha_vencimiento);
+  const puedeEnviar = !lic.en_revision && (lic.estado !== "VIGENTE" || !!lic.rechazo);
+  pubLicenciaConductor.innerHTML = `
+    <div class="preop-section-title" style="margin-top:0">🪪 Tu licencia de conducción</div>
+    <div class="preop-docs-list" style="margin-bottom:14px">
+      <div class="preop-doc-row${lic.rechazo && !lic.en_revision ? " preop-doc-row-rechazada" : ""}">
+        <div class="preop-doc-row-info">
+          <b>${info.icono} Licencia de Conducción${lic.categoria ? ` · ${escapeHtml(lic.categoria)}` : ""}</b>
+          <span class="muted">${info.texto}${fecha ? ` · ${fecha}` : ""}</span>
+          ${lic.rechazo && !lic.en_revision ? `<span class="preop-doc-rechazo-nota">❌ Tu coordinador rechazó la foto que enviaste${lic.rechazo.motivo ? `: “${escapeHtml(lic.rechazo.motivo)}”` : ""}. Envía una nueva.</span>` : ""}
+          ${lic.en_revision ? `<span style="font-size:12px;color:var(--ok);font-weight:700">✅ Ya enviaste la foto, tu coordinador la está revisando</span>` : ""}
+        </div>
+        ${puedeEnviar ? `
+          <label class="btn btn-sm btn-ghost preop-doc-btn-foto">
+            📷 Enviar foto
+            <input type="file" accept="image/*" capture="environment" id="pubLicenciaInput" style="position:absolute;inset:0;opacity:0;cursor:pointer" />
+          </label>` : ""}
+      </div>
+    </div>`;
+
+  document.getElementById("pubLicenciaInput")?.addEventListener("change", async (ev) => {
+    const input = ev.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    if (!pubPlaca.value) { showToast("Primero selecciona el vehículo.", "err"); return; }
+    try {
+      showToast("Subiendo foto…", "ok");
+      const fd = new FormData();
+      fd.set("cedula", cedula);
+      fd.set("nombre", nombre || "");
+      fd.set("placa", pubPlaca.value);
+      fd.set("file", file);
+      await callFnUpload("subir_licencia_conductor", fd);
+      showToast("Foto de tu licencia enviada al coordinador.", "ok");
+      cargarLicenciaConductor(cedula, nombre);
+    } catch (err) {
+      showToast(err.message || "No se pudo enviar la foto.", "err");
+    }
+  });
+}
+
 // ---------------- Modal de error/aviso ----------------
 let pubErrorAlCerrar = null;
 function mostrarError(titulo, mensaje, alCerrar){
@@ -382,8 +442,11 @@ function bloquearConductor(nombre, cedula){
   pubConductorWrap.classList.add("hidden");
   pubConductorConfirmadoNombre.textContent = nombre;
   pubConductorConfirmado.classList.remove("hidden");
+  cargarLicenciaConductor(cedula || pubCedula.value.trim(), nombre);
 }
 function desbloquearConductor(){
+  pubLicenciaConductor.classList.add("hidden");
+  pubLicenciaConductor.innerHTML = "";
   pubConductorConfirmado.classList.add("hidden");
   pubConductorWrap.classList.remove("hidden");
   pubConductor.value = "";
