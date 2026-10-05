@@ -326,6 +326,13 @@ async function cargarListado(){
     const email = userData?.user?.email || "";
     const rutas = (data.rutas || []).join(" · ") || "—";
     rutaLabel.innerHTML = `Ruta ${escapeHtml(rutas)} <span class="topbar-user">· conectado como <b>${escapeHtml(data.nombre_coordinador || email)}</b>${data.nombre_coordinador ? ` (${escapeHtml(email)})` : ""}</span>`;
+    const tabPreop = document.querySelector('.section-tab[data-section="preoperacional"]');
+    if (tabPreop) {
+      tabPreop.classList.toggle("hidden", data.tiene_preoperacional === false);
+      if (data.tiene_preoperacional === false && tabPreop.classList.contains("active")) {
+        document.querySelector('.section-tab[data-section="vehiculos"]')?.click();
+      }
+    }
     renderResumen();
     renderProgramacion();
     renderSolicitudesBimensual();
