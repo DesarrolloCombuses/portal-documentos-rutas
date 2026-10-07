@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <meta name="apple-mobile-web-app-title" content="Docs Ruta" />
-<link rel="stylesheet" href="css/styles.css?v=1.11.9" />
+<link rel="stylesheet" href="css/styles.css?v=1.12.0" />
 </head>
 <body>
 
@@ -65,6 +65,15 @@
       <div id="docsPendientesConductor" class="hidden"></div>
       <div class="section-toolbar">
         <input type="search" id="buscarVehiculo" placeholder="Buscar por placa o interno…" />
+      </div>
+      <div class="prog-toolbar">
+        <div class="prog-filtros" id="vehFiltros">
+          <button class="prog-filtro active" data-filtro="todos">Todos</button>
+          <button class="prog-filtro" data-filtro="sin_archivo">Sin archivo</button>
+          <button class="prog-filtro" data-filtro="vencidos">Vencidos</button>
+          <button class="prog-filtro" data-filtro="por_vencer">Por vencer</button>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnExportarFaltantesPdf">📄 Exportar PDF</button>
       </div>
       <div id="vehiculosGrid" class="cards-grid"></div>
     </section>
@@ -206,8 +215,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="js/conectividad.js?v=1.11.9"></script>
-<script src="js/app.js?v=1.11.9"></script>
-<script src="js/pwa.js?v=1.11.9"></script>
+<script src="js/conectividad.js?v=1.12.0"></script>
+<script src="js/app.js?v=1.12.0"></script>
+<script src="js/pwa.js?v=1.12.0"></script>
 </body>
 </html>

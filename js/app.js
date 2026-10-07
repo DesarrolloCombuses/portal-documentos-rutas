@@ -59,6 +59,8 @@ const secProgramacion = document.getElementById("secProgramacion");
 const secEscaneo = document.getElementById("secEscaneo");
 const secPreoperacional = document.getElementById("secPreoperacional");
 const progFiltros = document.getElementById("progFiltros");
+const vehFiltros = document.getElementById("vehFiltros");
+const btnExportarFaltantesPdf = document.getElementById("btnExportarFaltantesPdf");
 const progList = document.getElementById("progList");
 const btnExportarProgPdf = document.getElementById("btnExportarProgPdf");
 const docModal = document.getElementById("docModal");
@@ -89,6 +91,7 @@ const preopCumplimientoList = document.getElementById("preopCumplimientoList");
 let currentData = null;
 let escaneosActuales = [];
 let progFiltroActivo = "todas";
+let vehFiltroActivo = "todos";
 let preopActuales = [];
 let preopEvidencias = [];
 let preopRangoActivo = "hoy";
@@ -737,16 +740,72 @@ btnExportarProgPdf.addEventListener("click", () => {
   doc.save(`programacion_preventivo_${ruta}_${hoyISO()}.pdf`);
 });
 
-function renderVehiculos(){
+// Un documento puede no tener archivo de dos maneras, y al coordinador le
+// importan las dos: que no exista el registro en el sistema, o que exista con
+// su fecha pero nadie haya subido el PDF ni la foto. En la calle son lo mismo:
+// si para el transito, no hay papel que mostrar.
+function docsSinArchivoDeVehiculo(placa){
+  return (currentData?.tipos_flota || []).filter((t) => {
+    const d = docFor(currentData?.documentos_flota, (x) => x.placa === placa && x.tipo === t.tipo);
+    return !d || !d.storage_path;
+  }).map((t) => t.label);
+}
+
+function docsEnEstadoDeVehiculo(placa, estado){
+  return (currentData?.tipos_flota || []).filter((t) => {
+    const d = docFor(currentData?.documentos_flota, (x) => x.placa === placa && x.tipo === t.tipo);
+    return d && d.estado_vencimiento === estado;
+  }).map((t) => t.label);
+}
+
+const TITULO_FILTRO_VEH = {
+  sin_archivo: "Sin archivo",
+  vencidos: "Vencidos",
+  por_vencer: "Por vencer",
+};
+
+function documentosSenalados(placa, filtro){
+  if (filtro === "sin_archivo") return docsSinArchivoDeVehiculo(placa);
+  if (filtro === "vencidos") return docsEnEstadoDeVehiculo(placa, "VENCIDO");
+  if (filtro === "por_vencer") return docsEnEstadoDeVehiculo(placa, "POR_VENCER");
+  return [];
+}
+
+function vehiculosFiltrados(){
   const term = (buscarVehiculo.value || "").trim().toLowerCase();
-  const rows = (currentData?.vehiculos || []).filter((v) =>
-    !term || v.placa.toLowerCase().includes(term) || String(v.interno || "").toLowerCase().includes(term)
-  );
+  return (currentData?.vehiculos || [])
+    .filter((v) => !term || v.placa.toLowerCase().includes(term) || String(v.interno || "").toLowerCase().includes(term))
+    .map((v) => ({ v, senalados: documentosSenalados(v.placa, vehFiltroActivo) }))
+    .filter((f) => vehFiltroActivo === "todos" || f.senalados.length);
+}
+
+// El numero va en el propio boton para no tener que contar a mano.
+function renderContadoresVehiculos(){
+  if (!vehFiltros) return;
+  const todos = currentData?.vehiculos || [];
+  const cuantos = (filtro) => todos.filter((v) => documentosSenalados(v.placa, filtro).length).length;
+  const etiquetas = {
+    todos: `Todos (${todos.length})`,
+    sin_archivo: `Sin archivo (${cuantos("sin_archivo")})`,
+    vencidos: `Vencidos (${cuantos("vencidos")})`,
+    por_vencer: `Por vencer (${cuantos("por_vencer")})`,
+  };
+  vehFiltros.querySelectorAll(".prog-filtro").forEach((b) => {
+    const k = b.getAttribute("data-filtro");
+    if (etiquetas[k]) b.textContent = etiquetas[k];
+  });
+}
+
+function renderVehiculos(){
+  renderContadoresVehiculos();
+  const rows = vehiculosFiltrados();
   if (!rows.length) {
-    vehiculosGrid.innerHTML = `<div class="empty-state">No hay vehículos que coincidan.</div>`;
+    vehiculosGrid.innerHTML = vehFiltroActivo === "todos"
+      ? `<div class="empty-state">No hay vehículos que coincidan.</div>`
+      : `<div class="empty-state">Ningún vehículo en «${TITULO_FILTRO_VEH[vehFiltroActivo]}».</div>`;
     return;
   }
-  vehiculosGrid.innerHTML = rows.map((v) => {
+  vehiculosGrid.innerHTML = rows.map(({ v, senalados }) => {
     const estados = estadoDeVehiculo(v.placa).filter(Boolean);
     const peor = peorEstado(estados);
     return `
@@ -758,6 +817,7 @@ function renderVehiculos(){
           </div>
           ${peor ? `<span class="status-pill ${estadoClass(peor)}">${estadoLabel(peor)}</span>` : ""}
         </div>
+        ${senalados.length ? `<div class="card-aviso"><b>${TITULO_FILTRO_VEH[vehFiltroActivo]}:</b> ${escapeHtml(senalados.join(", "))}</div>` : ""}
         <div class="entity-card-docs">
           ${(currentData.tipos_flota || []).map((t) => {
             const d = docFor(currentData.documentos_flota, (x) => x.placa === v.placa && x.tipo === t.tipo);
@@ -1139,6 +1199,58 @@ document.querySelectorAll(".section-tab").forEach((tab) => {
   });
 });
 buscarVehiculo.addEventListener("input", renderVehiculos);
+
+vehFiltros.querySelectorAll(".prog-filtro").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    vehFiltros.querySelectorAll(".prog-filtro").forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
+    vehFiltroActivo = btn.getAttribute("data-filtro");
+    renderVehiculos();
+  });
+});
+
+// La misma lista que se esta viendo, en PDF, para salir a buscar los papeles.
+btnExportarFaltantesPdf.addEventListener("click", () => {
+  const rows = vehiculosFiltrados();
+  if (!rows.length) { showToast("No hay vehículos para exportar con este filtro.", "warn"); return; }
+  const titulo = vehFiltroActivo === "todos" ? "Vehículos" : `Documentos · ${TITULO_FILTRO_VEH[vehFiltroActivo]}`;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const margin = 40;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  let y = margin;
+
+  doc.setFontSize(14);
+  doc.text(`${titulo} · ${(currentData?.rutas || []).join(", ")}`, margin, y);
+  y += 18;
+  doc.setFontSize(9);
+  doc.text(`Generado: ${new Date().toLocaleString("es-CO")} · ${rows.length} vehículos`, margin, y);
+  y += 24;
+
+  doc.setFontSize(10);
+  doc.setFont(undefined, "bold");
+  doc.text("Interno", margin, y);
+  doc.text("Placa", margin + 60, y);
+  doc.text(vehFiltroActivo === "todos" ? "Vehículo" : "Documentos", margin + 140, y);
+  doc.setFont(undefined, "normal");
+  y += 6;
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 14;
+
+  rows.forEach(({ v, senalados }) => {
+    const detalle = senalados.length ? senalados.join(", ") : `${v.marca || ""} ${v.modelo || ""}`.trim();
+    const lineas = doc.splitTextToSize(detalle || "—", pageWidth - margin * 2 - 140);
+    if (y + lineas.length * 12 > pageHeight - margin) { doc.addPage(); y = margin; }
+    doc.text(String(v.interno || "—"), margin, y);
+    doc.text(String(v.placa || "—"), margin + 60, y);
+    doc.text(lineas, margin + 140, y);
+    y += Math.max(16, lineas.length * 12 + 4);
+  });
+
+  const ruta = ((currentData?.rutas || [])[0] || "ruta").replace(/[^\w-]+/g, "_");
+  doc.save(`documentos_${vehFiltroActivo}_${ruta}_${hoyISO()}.pdf`);
+});
 buscarConductor.addEventListener("input", renderConductores);
 
 // ---------------- Agregar conductor ----------------
