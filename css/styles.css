@@ -543,3 +543,6 @@ input:focus,select:focus{outline:none; border-color:var(--brand); box-shadow:var
   background:#fff7ed; border:1px solid #fed7aa; color:#9a3412;
   font-size:12.5px; line-height:1.4;
 }
+
+.veh-doc-filtros{margin:-6px 0 14px; padding-left:2px}
+.veh-doc-filtros .prog-filtro{font-size:12.5px}

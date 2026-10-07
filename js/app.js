@@ -61,6 +61,7 @@ const secPreoperacional = document.getElementById("secPreoperacional");
 const progFiltros = document.getElementById("progFiltros");
 const vehFiltros = document.getElementById("vehFiltros");
 const btnExportarFaltantesPdf = document.getElementById("btnExportarFaltantesPdf");
+const vehDocFiltros = document.getElementById("vehDocFiltros");
 const progList = document.getElementById("progList");
 const btnExportarProgPdf = document.getElementById("btnExportarProgPdf");
 const docModal = document.getElementById("docModal");
@@ -92,6 +93,7 @@ let currentData = null;
 let escaneosActuales = [];
 let progFiltroActivo = "todas";
 let vehFiltroActivo = "todos";
+let vehDocActivo = "todos";
 let preopActuales = [];
 let preopEvidencias = [];
 let preopRangoActivo = "hoy";
@@ -748,14 +750,14 @@ function docsSinArchivoDeVehiculo(placa){
   return (currentData?.tipos_flota || []).filter((t) => {
     const d = docFor(currentData?.documentos_flota, (x) => x.placa === placa && x.tipo === t.tipo);
     return !d || !d.storage_path;
-  }).map((t) => t.label);
+  });
 }
 
 function docsEnEstadoDeVehiculo(placa, estado){
   return (currentData?.tipos_flota || []).filter((t) => {
     const d = docFor(currentData?.documentos_flota, (x) => x.placa === placa && x.tipo === t.tipo);
     return d && d.estado_vencimiento === estado;
-  }).map((t) => t.label);
+  });
 }
 
 const TITULO_FILTRO_VEH = {
@@ -775,8 +777,58 @@ function vehiculosFiltrados(){
   const term = (buscarVehiculo.value || "").trim().toLowerCase();
   return (currentData?.vehiculos || [])
     .filter((v) => !term || v.placa.toLowerCase().includes(term) || String(v.interno || "").toLowerCase().includes(term))
-    .map((v) => ({ v, senalados: documentosSenalados(v.placa, vehFiltroActivo) }))
+    .map((v) => ({
+      v,
+      senalados: documentosSenalados(v.placa, vehFiltroActivo)
+        .filter((t) => vehDocActivo === "todos" || t.tipo === vehDocActivo),
+    }))
     .filter((f) => vehFiltroActivo === "todos" || f.senalados.length);
+}
+
+// Segunda fila de botones: el mismo filtro, pero documento por documento.
+// Un SOAT vencido y un mantenimiento vencido no se resuelven igual ni los
+// busca la misma persona, por eso van separados.
+function renderFiltroDocumentos(){
+  if (!vehDocFiltros) return;
+  if (vehFiltroActivo === "todos") {
+    vehDocFiltros.classList.add("hidden");
+    vehDocFiltros.innerHTML = "";
+    return;
+  }
+  const todos = currentData?.vehiculos || [];
+  const porTipo = (tipo) => todos.filter((v) =>
+    documentosSenalados(v.placa, vehFiltroActivo).some((t) => t.tipo === tipo)).length;
+  const total = todos.filter((v) => documentosSenalados(v.placa, vehFiltroActivo).length).length;
+  const tipos = (currentData?.tipos_flota || [])
+    .map((t) => ({ tipo: t.tipo, label: t.label, n: porTipo(t.tipo) }))
+    .filter((t) => t.n > 0);
+
+  // Si el documento elegido ya no tiene vehiculos en este estado, se vuelve a todos.
+  if (vehDocActivo !== "todos" && !tipos.some((t) => t.tipo === vehDocActivo)) vehDocActivo = "todos";
+
+  vehDocFiltros.classList.remove("hidden");
+  vehDocFiltros.innerHTML = [
+    `<button class="prog-filtro ${vehDocActivo === "todos" ? "active" : ""}" data-doc="todos">Todos los documentos (${total})</button>`,
+  ].concat(tipos.map((t) =>
+    `<button class="prog-filtro ${vehDocActivo === t.tipo ? "active" : ""}" data-doc="${escapeHtml(t.tipo)}">${escapeHtml(t.label)} (${t.n})</button>`
+  )).join("");
+
+  vehDocFiltros.querySelectorAll(".prog-filtro").forEach((b) => {
+    b.addEventListener("click", () => {
+      vehDocActivo = b.getAttribute("data-doc");
+      renderVehiculos();
+    });
+  });
+}
+
+// Las filas que se estan viendo, agrupadas por documento.
+function gruposPorDocumento(rows){
+  const grupos = [];
+  (currentData?.tipos_flota || []).forEach((t) => {
+    const dentro = rows.filter((f) => f.senalados.some((s) => s.tipo === t.tipo));
+    if (dentro.length) grupos.push({ label: t.label, filas: dentro });
+  });
+  return grupos;
 }
 
 // El numero va en el propio boton para no tener que contar a mano.
@@ -798,11 +850,12 @@ function renderContadoresVehiculos(){
 
 function renderVehiculos(){
   renderContadoresVehiculos();
+  renderFiltroDocumentos();
   const rows = vehiculosFiltrados();
   if (!rows.length) {
     vehiculosGrid.innerHTML = vehFiltroActivo === "todos"
       ? `<div class="empty-state">No hay vehículos que coincidan.</div>`
-      : `<div class="empty-state">Ningún vehículo en «${TITULO_FILTRO_VEH[vehFiltroActivo]}».</div>`;
+      : `<div class="empty-state">Ningún vehículo en «${TITULO_FILTRO_VEH[vehFiltroActivo]}»${vehDocActivo === "todos" ? "" : " con ese documento"}.</div>`;
     return;
   }
   vehiculosGrid.innerHTML = rows.map(({ v, senalados }) => {
@@ -817,7 +870,7 @@ function renderVehiculos(){
           </div>
           ${peor ? `<span class="status-pill ${estadoClass(peor)}">${estadoLabel(peor)}</span>` : ""}
         </div>
-        ${senalados.length ? `<div class="card-aviso"><b>${TITULO_FILTRO_VEH[vehFiltroActivo]}:</b> ${escapeHtml(senalados.join(", "))}</div>` : ""}
+        ${senalados.length ? `<div class="card-aviso"><b>${TITULO_FILTRO_VEH[vehFiltroActivo]}:</b> ${escapeHtml(senalados.map((s) => s.label).join(", "))}</div>` : ""}
         <div class="entity-card-docs">
           ${(currentData.tipos_flota || []).map((t) => {
             const d = docFor(currentData.documentos_flota, (x) => x.placa === v.placa && x.tipo === t.tipo);
@@ -1205,6 +1258,7 @@ vehFiltros.querySelectorAll(".prog-filtro").forEach((btn) => {
     vehFiltros.querySelectorAll(".prog-filtro").forEach((b) => b.classList.remove("active"));
     btn.classList.add("active");
     vehFiltroActivo = btn.getAttribute("data-filtro");
+    vehDocActivo = "todos";
     renderVehiculos();
   });
 });
@@ -1228,28 +1282,52 @@ btnExportarFaltantesPdf.addEventListener("click", () => {
   doc.text(`Generado: ${new Date().toLocaleString("es-CO")} · ${rows.length} vehículos`, margin, y);
   y += 24;
 
-  doc.setFontSize(10);
-  doc.setFont(undefined, "bold");
-  doc.text("Interno", margin, y);
-  doc.text("Placa", margin + 60, y);
-  doc.text(vehFiltroActivo === "todos" ? "Vehículo" : "Documentos", margin + 140, y);
-  doc.setFont(undefined, "normal");
-  y += 6;
-  doc.line(margin, y, pageWidth - margin, y);
-  y += 14;
+  const salto = (alto) => { if (y + alto > pageHeight - margin) { doc.addPage(); y = margin; } };
 
-  rows.forEach(({ v, senalados }) => {
-    const detalle = senalados.length ? senalados.join(", ") : `${v.marca || ""} ${v.modelo || ""}`.trim();
-    const lineas = doc.splitTextToSize(detalle || "—", pageWidth - margin * 2 - 140);
-    if (y + lineas.length * 12 > pageHeight - margin) { doc.addPage(); y = margin; }
-    doc.text(String(v.interno || "—"), margin, y);
-    doc.text(String(v.placa || "—"), margin + 60, y);
-    doc.text(lineas, margin + 140, y);
-    y += Math.max(16, lineas.length * 12 + 4);
-  });
+  if (vehFiltroActivo === "todos") {
+    doc.setFontSize(10);
+    doc.setFont(undefined, "bold");
+    doc.text("Interno", margin, y);
+    doc.text("Placa", margin + 60, y);
+    doc.text("Vehículo", margin + 140, y);
+    doc.setFont(undefined, "normal");
+    y += 6;
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 14;
+    rows.forEach(({ v }) => {
+      salto(16);
+      doc.text(String(v.interno || "—"), margin, y);
+      doc.text(String(v.placa || "—"), margin + 60, y);
+      doc.text(`${v.marca || ""} ${v.modelo || ""}`.trim() || "—", margin + 140, y);
+      y += 16;
+    });
+  } else {
+    // Una hoja de trabajo por documento: el que sale a buscar los SOAT no
+    // tiene que leerse toda la lista.
+    gruposPorDocumento(rows).forEach((g, i) => {
+      salto(60);
+      if (i > 0) y += 10;
+      doc.setFontSize(12);
+      doc.setFont(undefined, "bold");
+      doc.text(`${g.label} · ${g.filas.length} vehículo${g.filas.length === 1 ? "" : "s"}`, margin, y);
+      doc.setFont(undefined, "normal");
+      doc.setFontSize(10);
+      y += 6;
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 14;
+      g.filas.forEach(({ v }) => {
+        salto(16);
+        doc.text(String(v.interno || "—"), margin, y);
+        doc.text(String(v.placa || "—"), margin + 60, y);
+        doc.text(`${v.marca || ""} ${v.modelo || ""}`.trim() || "—", margin + 140, y);
+        y += 16;
+      });
+    });
+  }
 
   const ruta = ((currentData?.rutas || [])[0] || "ruta").replace(/[^\w-]+/g, "_");
-  doc.save(`documentos_${vehFiltroActivo}_${ruta}_${hoyISO()}.pdf`);
+  const sufijo = vehDocActivo === "todos" ? "" : `_${vehDocActivo.toLowerCase()}`;
+  doc.save(`documentos_${vehFiltroActivo}${sufijo}_${ruta}_${hoyISO()}.pdf`);
 });
 buscarConductor.addEventListener("input", renderConductores);
 
