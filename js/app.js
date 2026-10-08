@@ -357,6 +357,15 @@ async function cargarListado(){
   }
 }
 
+// El modelo es el ano del bus, y el coordinador lo necesita a la vista: de el
+// dependen la tecnomecanica, la tarjeta de operacion y la edad del parque.
+function descripcionVehiculo(v){
+  const partes = [];
+  if (v?.marca) partes.push(String(v.marca));
+  if (v?.modelo) partes.push(`Modelo ${v.modelo}`);
+  return partes.join(" \u00b7 ") || "Sin modelo registrado";
+}
+
 function docFor(lista, matchFn){
   return (lista || []).find(matchFn) || null;
 }
@@ -866,7 +875,7 @@ function renderVehiculos(){
         <div class="entity-card-head">
           <div>
             <div class="entity-card-title">${escapeHtml(v.placa)}</div>
-            <div class="entity-card-sub">Interno ${escapeHtml(v.interno || "—")} · ${escapeHtml(v.marca || "")} ${escapeHtml(v.modelo || "")}</div>
+            <div class="entity-card-sub">Interno ${escapeHtml(v.interno || "—")} · ${escapeHtml(descripcionVehiculo(v))}</div>
           </div>
           ${peor ? `<span class="status-pill ${estadoClass(peor)}">${estadoLabel(peor)}</span>` : ""}
         </div>
@@ -937,7 +946,7 @@ function abrirModalVehiculo(placa){
   const v = (currentData.vehiculos || []).find((x) => x.placa === placa);
   if (!v) return;
   const tiposConductor = new Set((currentData.tipos_flota_conductor || []).map((t) => t.tipo));
-  docModalTitle.textContent = `${v.placa} · Interno ${v.interno || "—"}`;
+  docModalTitle.textContent = `${v.placa} · Interno ${v.interno || "—"} · ${descripcionVehiculo(v)}`;
   docModalBody.innerHTML = (currentData.tipos_flota || []).map((t) => {
     const d = docFor(currentData.documentos_flota, (x) => x.placa === placa && x.tipo === t.tipo);
     const est = d ? d.estado_vencimiento : null;
@@ -1284,44 +1293,44 @@ btnExportarFaltantesPdf.addEventListener("click", () => {
 
   const salto = (alto) => { if (y + alto > pageHeight - margin) { doc.addPage(); y = margin; } };
 
-  if (vehFiltroActivo === "todos") {
+  const encabezado = () => {
     doc.setFontSize(10);
     doc.setFont(undefined, "bold");
     doc.text("Interno", margin, y);
     doc.text("Placa", margin + 60, y);
-    doc.text("Vehículo", margin + 140, y);
+    doc.text("Marca", margin + 140, y);
+    doc.text("Modelo", margin + 280, y);
     doc.setFont(undefined, "normal");
     y += 6;
     doc.line(margin, y, pageWidth - margin, y);
     y += 14;
-    rows.forEach(({ v }) => {
-      salto(16);
-      doc.text(String(v.interno || "—"), margin, y);
-      doc.text(String(v.placa || "—"), margin + 60, y);
-      doc.text(`${v.marca || ""} ${v.modelo || ""}`.trim() || "—", margin + 140, y);
-      y += 16;
-    });
+  };
+  const fila = (v) => {
+    salto(16);
+    doc.text(String(v.interno || "—"), margin, y);
+    doc.text(String(v.placa || "—"), margin + 60, y);
+    doc.text(String(v.marca || "—"), margin + 140, y);
+    doc.text(String(v.modelo || "—"), margin + 280, y);
+    y += 16;
+  };
+
+  if (vehFiltroActivo === "todos") {
+    encabezado();
+    rows.forEach(({ v }) => fila(v));
   } else {
     // Una hoja de trabajo por documento: el que sale a buscar los SOAT no
     // tiene que leerse toda la lista.
     gruposPorDocumento(rows).forEach((g, i) => {
-      salto(60);
+      salto(80);
       if (i > 0) y += 10;
       doc.setFontSize(12);
       doc.setFont(undefined, "bold");
       doc.text(`${g.label} · ${g.filas.length} vehículo${g.filas.length === 1 ? "" : "s"}`, margin, y);
       doc.setFont(undefined, "normal");
       doc.setFontSize(10);
-      y += 6;
-      doc.line(margin, y, pageWidth - margin, y);
-      y += 14;
-      g.filas.forEach(({ v }) => {
-        salto(16);
-        doc.text(String(v.interno || "—"), margin, y);
-        doc.text(String(v.placa || "—"), margin + 60, y);
-        doc.text(`${v.marca || ""} ${v.modelo || ""}`.trim() || "—", margin + 140, y);
-        y += 16;
-      });
+      y += 16;
+      encabezado();
+      g.filas.forEach(({ v }) => fila(v));
     });
   }
 
