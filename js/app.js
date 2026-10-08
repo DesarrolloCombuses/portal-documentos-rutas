@@ -867,8 +867,16 @@ function renderVehiculos(){
       : `<div class="empty-state">Ningún vehículo en «${TITULO_FILTRO_VEH[vehFiltroActivo]}»${vehDocActivo === "todos" ? "" : " con ese documento"}.</div>`;
     return;
   }
+  // Si el coordinador pidio un documento, la tarjeta muestra ESE documento.
+  // Ver los seis papeles cuando se pregunto por uno solo es ruido: toca
+  // buscar con el dedo cual era el que faltaba.
+  const tiposCard = (currentData.tipos_flota || [])
+    .filter((t) => vehDocActivo === "todos" || t.tipo === vehDocActivo);
+
   vehiculosGrid.innerHTML = rows.map(({ v, senalados }) => {
-    const estados = estadoDeVehiculo(v.placa).filter(Boolean);
+    const estados = tiposCard
+      .map((t) => docFor(currentData.documentos_flota, (x) => x.placa === v.placa && x.tipo === t.tipo)?.estado_vencimiento || null)
+      .filter(Boolean);
     const peor = peorEstado(estados);
     return `
       <div class="entity-card" data-placa="${escapeHtml(v.placa)}">
@@ -879,13 +887,16 @@ function renderVehiculos(){
           </div>
           ${peor ? `<span class="status-pill ${estadoClass(peor)}">${estadoLabel(peor)}</span>` : ""}
         </div>
-        ${senalados.length ? `<div class="card-aviso"><b>${TITULO_FILTRO_VEH[vehFiltroActivo]}:</b> ${escapeHtml(senalados.map((s) => s.label).join(", "))}</div>` : ""}
+        ${vehDocActivo === "todos" && senalados.length ? `<div class="card-aviso"><b>${TITULO_FILTRO_VEH[vehFiltroActivo]}:</b> ${escapeHtml(senalados.map((s) => s.label).join(", "))}</div>` : ""}
         <div class="entity-card-docs">
-          ${(currentData.tipos_flota || []).map((t) => {
+          ${tiposCard.map((t) => {
             const d = docFor(currentData.documentos_flota, (x) => x.placa === v.placa && x.tipo === t.tipo);
             const est = d ? d.estado_vencimiento : null;
+            const venceHtml = d?.fecha_vencimiento && !t.sin_vencimiento && vehDocActivo !== "todos"
+              ? `<span class="mini-doc-vence">vence ${escapeHtml(fmtFecha(d.fecha_vencimiento))}</span>`
+              : "";
             return `<div class="mini-doc">
-              <span class="mini-doc-label">${escapeHtml(t.label)}</span>
+              <span class="mini-doc-label">${escapeHtml(t.label)}${venceHtml}</span>
               <span class="status-pill ${estadoClass(est)}">${estadoLabel(est, t)}</span>
             </div>`;
           }).join("")}
