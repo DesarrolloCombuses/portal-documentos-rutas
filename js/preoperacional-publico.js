@@ -1,5 +1,5 @@
 // Checklist Preoperacional - link publico (SIN login) para conductores de
-// Zamora y Aranjuez - Guadalupe. Reemplaza la vieja app de Google Apps Script.
+// Zamora, Aranjuez - Guadalupe y Terminal 313. Reemplaza la vieja app de Google Apps Script.
 // Habla solo con la edge function preoperacional-publico (verify_jwt=false),
 // que valida todo del lado del servidor (no confia en nada del navegador).
 //
@@ -198,7 +198,7 @@ document.querySelectorAll('input[name="preop_conductor_apto"]').forEach((input) 
   });
 });
 
-// ---------------- Catálogo (vehículos + conductores de Zamora/Aranjuez) ----------------
+// ---------------- Catálogo (vehículos + conductores de Zamora/Aranjuez/Terminal 313) ----------------
 function renderVehiculoOptions(){
   const term = (pubFiltroVehiculo.value || "").trim().toLowerCase();
   const filtrados = vehiculos.filter((v) =>
